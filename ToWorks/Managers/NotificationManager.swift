@@ -204,24 +204,6 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
         }
     }
     
-    /// Save a NotificationRecord into SwiftData so it appears in the history list.
-    private func saveNotificationRecord(title: String, body: String) {
-        guard let container = modelContainer else {
-            print("⚠️ No modelContainer set on NotificationManager — cannot save notification record.")
-            return
-        }
-        Task { @MainActor in
-            let context = container.mainContext
-            let record = NotificationRecord(title: title, body: body, timestamp: Date())
-            context.insert(record)
-            try? context.save()
-            print("📝 Saved notification record: \(title)")
-        }
-    }
-    
-        completionHandler()
-    }
-    
     // Handle notification tap & actions
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
@@ -241,26 +223,21 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
                        .replacingOccurrences(of: "_minus", with: "")
                        .replacingOccurrences(of: "_plus", with: "")
         
-        // ... (rest of the method remains same)
+        // Check for specific actions
         switch response.actionIdentifier {
         case "COMPLETE_ACTION":
-            // ...
+            // We can't easily mark complete here without ModelContext access.
+            // Instead, we'll launch the app and let the view handle it via activeAlarmID
             print("✅ Complete Action Tapped")
             DispatchQueue.main.async {
                 self.activeAlarmID = id
             }
             
         case "SNOOZE_ACTION":
-            // ...
-            if response.notification.request.content.userInfo["originalDate"] is Date {
-                let newDate = Date().addingTimeInterval(5 * 60)
-                let content = response.notification.request.content
-                scheduleNotification(id: id, title: content.title, body: content.body, date: newDate)
-            } else {
-                 let newDate = Date().addingTimeInterval(5 * 60)
-                 let content = response.notification.request.content
-                 scheduleNotification(id: id, title: content.title, body: content.body, date: newDate)
-            }
+            // Reschedule for 5 min later
+            let newDate = Date().addingTimeInterval(5 * 60)
+            let content = response.notification.request.content
+            scheduleNotification(id: id, title: content.title, body: content.body, date: newDate)
             
         case UNNotificationDefaultActionIdentifier:
             // User tapped the notification -> Open Alarm View
@@ -275,7 +252,7 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
         
         completionHandler()
     }
-
+    
     /// Save a NotificationRecord into SwiftData so it appears in the history list.
     private func saveNotificationRecord(title: String, body: String) {
         guard let container = modelContainer else {
