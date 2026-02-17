@@ -433,7 +433,7 @@ struct VoiceCommandView: View {
         guard !raw.isEmpty, raw != "Listening...", raw != speechManager.activeLanguage.listeningText else { return }
         
         // Normalize: Convert Kanji/Hanzi/Full-width numbers to ASCII digits
-        let workingText = normalizeVoiceInput(raw)
+        var workingText = normalizeVoiceInput(raw)
         
         var title = ""
         var notes = ""
