@@ -387,7 +387,7 @@ struct CalendarView: View {
                         .frame(maxHeight: .infinity)
                 }
             }
-            .frame(width: 40)
+            .frame(width: 60)
             
             // Card
             VStack(alignment: .leading, spacing: 6) {
