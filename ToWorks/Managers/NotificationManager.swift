@@ -219,41 +219,44 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
         }
     }
     
+        completionHandler()
+    }
+    
     // Handle notification tap & actions
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
+        // Save history record when user taps notification (if not already saved by willPresent)
+        saveNotificationRecord(
+            title: response.notification.request.content.title,
+            body: response.notification.request.content.body
+        )
+        
         let fullID = response.notification.request.identifier
-        // Strip suffixes to get true Task ID
         // Strip suffixes to get true Task ID
         let id = fullID.replacingOccurrences(of: "_before", with: "")
                        .replacingOccurrences(of: "_after", with: "")
                        .replacingOccurrences(of: "_minus", with: "")
                        .replacingOccurrences(of: "_plus", with: "")
         
-        // Check for specific actions
+        // ... (rest of the method remains same)
         switch response.actionIdentifier {
         case "COMPLETE_ACTION":
-            // We can't easily mark complete here without ModelContext access.
-            // Instead, we'll launch the app and let the view handle it via activeAlarmID
+            // ...
             print("✅ Complete Action Tapped")
             DispatchQueue.main.async {
                 self.activeAlarmID = id
             }
             
         case "SNOOZE_ACTION":
-            print("Ez Snooze Action Tapped")
-            // Reschedule for 5 min later
+            // ...
             if response.notification.request.content.userInfo["originalDate"] is Date {
-                // If we have original date, add 5 min to NOW, or original?
-                // Simpler: 5 min from NOW
                 let newDate = Date().addingTimeInterval(5 * 60)
                 let content = response.notification.request.content
                 scheduleNotification(id: id, title: content.title, body: content.body, date: newDate)
             } else {
-                 // Fallback snooze
                  let newDate = Date().addingTimeInterval(5 * 60)
                  let content = response.notification.request.content
                  scheduleNotification(id: id, title: content.title, body: content.body, date: newDate)
@@ -271,5 +274,34 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
         }
         
         completionHandler()
+    }
+
+    /// Save a NotificationRecord into SwiftData so it appears in the history list.
+    private func saveNotificationRecord(title: String, body: String) {
+        guard let container = modelContainer else {
+            print("⚠️ No modelContainer set on NotificationManager — cannot save notification record.")
+            return
+        }
+        Task { @MainActor in
+            let context = container.mainContext
+            
+            // Deduplication: Check if similar record exists within last 2 seconds
+            let twoSecondsAgo = Date().addingTimeInterval(-2)
+            let descriptor = FetchDescriptor<NotificationRecord>(
+                predicate: #Predicate {
+                    $0.title == title && $0.body == body && $0.timestamp > twoSecondsAgo
+                }
+            )
+            
+            if let existing = try? context.fetch(descriptor), !existing.isEmpty {
+                print("♻️ Duplicate notification record ignored: \(title)")
+                return
+            }
+            
+            let record = NotificationRecord(title: title, body: body, timestamp: Date())
+            context.insert(record)
+            try? context.save()
+            print("📝 Saved notification record: \(title)")
+        }
     }
 }
