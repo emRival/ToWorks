@@ -71,16 +71,13 @@ class SpeechManager: ObservableObject {
     }
     
     func startRecording() {
-        // 1. Check if language is supported on this device
+        // 1. Resolve Locale
         let locale = resolvedLocale
-        if !SFSpeechRecognizer.supportedLocales().contains(locale) {
-            self.error = "Language \(locale.identifier) is not supported on this device."
-            return
-        }
         
         // 2. Initialize Recognizer
+        // We rely on the initializer failing if the locale is truly unsupported
         guard let recognizer = SFSpeechRecognizer(locale: locale) else {
-            self.error = "Voice language not supported on this device"
+            self.error = "Voice language (\(locale.identifier)) not supported on this device"
             return
         }
         
