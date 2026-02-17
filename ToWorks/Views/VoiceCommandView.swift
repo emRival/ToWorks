@@ -611,6 +611,11 @@ struct VoiceCommandView: View {
         
         title = title.trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
         
+        // FAILSAFE: If title is empty after cleaning (e.g. user just said "Tomorrow at 9"), fall back to original text
+        if title.isEmpty {
+            title = workingText.isEmpty ? raw : workingText
+        }
+        
         // Capitalize first letter of title
         if let first = title.first {
             title = first.uppercased() + title.dropFirst()
