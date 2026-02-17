@@ -591,7 +591,7 @@ struct VoiceCommandView: View {
             #"(?i)(\d{1,2})(?:[.:](\d{2}))?\s*(am|pm|h|heures|uhr|horas|baje|โมง|giờ|시|点|點|時)"#,
             // CJK Clean patterns
             #"\s*明日"#, #"\s*明天"#, #"\s*明後日"#, #"\s*后天"#, #"\s*来週"#, #"\s*下周"#,
-            #"(午前|午後|上午|下午)?\s*(\d{1,2})\s*(?:時|点|點)(?:\s*(\d{1,2})\s*(?:分))?"#
+            #"(午前|午後|朝|夜|深夜|夕方|上午|下午|早上|晚上|中午|凌晨|오전|오후|아침|저녁|밤|새벽)?\s*(\d{1,2})\s*(?:時|点|點|시)(?:\s*(\d{1,2})\s*(?:分|분))?(?:に|へ|에|から|まで|부터|まで)?"#
         ]
         for pattern in cleanPatterns {
             title = title.replacingOccurrences(of: pattern, with: "", options: .regularExpression, range: title.startIndex..<title.endIndex)
@@ -829,10 +829,11 @@ struct VoiceCommandView: View {
         }
         
         // CJK / Korean Contextual Time
-        // Japanese: "午後3時", "15時"
-        // Korean: "오후 3시", "3시"
-        // Chinese: "下午3点", "15点"
-        let cjkPattern = #"(午前|午後|上午|下午|오전|오후)?\s*(\d{1,2})\s*(?:時|点|點|시)(?:\s*(\d{1,2})\s*(?:分|분))?"#
+        // Japanese: "午後9時", "夜9時", "9時に"
+        // Korean: "오후 3시", "저녁 9시", "9시에"
+        // Chinese: "下午3点", "晚上9点"
+        // Modifiers: Gozen/Gogo/Asa/Yoru/Gogo/Shangwu/Xiawu/Wanshang/Ojeon/Ohu/Jeonyeok/Bam etc.
+        let cjkPattern = #"(午前|午後|朝|夜|深夜|夕方|上午|下午|早上|晚上|中午|凌晨|오전|오후|아침|저녁|밤|새벽)?\s*(\d{1,2})\s*(?:時|点|點|시)(?:\s*(\d{1,2})\s*(?:分|분))?(?:に|へ|에|から|まで|부터|まで)?"#
         if let match = text.range(of: cjkPattern, options: .regularExpression) {
             let timeStr = String(text[match])
             return extractCJKTime(from: timeStr, pattern: cjkPattern, baseDate: baseDate) ?? baseDate
@@ -907,7 +908,7 @@ struct VoiceCommandView: View {
     // Legacy functions replaced by universal ones, keeping CJK
     
     private func extractCJKTime(from text: String, pattern: String, baseDate: Date) -> Date? {
-        // Group 1: Modifier (Optional) - Gozen/Gogo/Shangwu/Xiawu/Ojeon/Ohu
+        // Group 1: Modifier (Optional)
         // Group 2: Hour
         // Group 3: Minute (Optional)
         guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { return nil }
@@ -919,8 +920,15 @@ struct VoiceCommandView: View {
         
         if match.range(at: 1).location != NSNotFound, let modRange = Range(match.range(at: 1), in: text) {
             let modifier = String(text[modRange])
-            if ["午後", "下午", "오후"].contains(modifier) { isPM = true }
-            if ["午前", "上午", "오전"].contains(modifier) { isAM = true }
+            
+            // PM Keywords
+            if ["午後", "下午", "오후", "夜", "夕方", "晚上", "中午", "저녁", "밤"].contains(modifier) {
+                isPM = true
+            }
+            // AM Keywords (Explicit)
+            if ["午前", "上午", "오전", "朝", "早上", "凌晨", "아침", "새벽"].contains(modifier) {
+                isAM = true
+            }
         }
         
         let hourRange = Range(match.range(at: 2), in: text)
