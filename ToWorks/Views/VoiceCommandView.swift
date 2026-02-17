@@ -714,6 +714,17 @@ struct VoiceCommandView: View {
             return cal.date(byAdding: .weekOfYear, value: 1, to: now)
         }
         
+        // CJK keywords
+        if text.contains("明日") || text.contains("明天") {
+            return cal.date(byAdding: .day, value: 1, to: now)
+        }
+        if text.contains("明後日") || text.contains("后天") {
+            return cal.date(byAdding: .day, value: 2, to: now)
+        }
+        if text.contains("来週") || text.contains("下周") {
+            return cal.date(byAdding: .weekOfYear, value: 1, to: now)
+        }
+        
         // Next [day of week]
         let dayMap: [(String, Int)] = [
             ("monday", 2), ("senin", 2),
@@ -734,6 +745,20 @@ struct VoiceCommandView: View {
         if let match = text.range(of: #"tanggal (\d{1,2})"#, options: .regularExpression) {
             let numStr = text[match].replacingOccurrences(of: "tanggal ", with: "")
             if let day = Int(numStr) {
+                var comps = cal.dateComponents([.year, .month], from: now)
+                comps.day = day
+                if let result = cal.date(from: comps), result > now {
+                    return result
+                } else {
+                    comps.month = (comps.month ?? 1) + 1
+                    return cal.date(from: comps)
+                }
+            }
+        }
+        // "XX日" (CJK for "Date XX")
+        if let match = text.range(of: #"(\d{1,2})日"#, options: .regularExpression) {
+            let timeStr = String(text[match])
+            if let range = timeStr.range(of: #"\d+"#, options: .regularExpression), let day = Int(timeStr[range]) {
                 var comps = cal.dateComponents([.year, .month], from: now)
                 comps.day = day
                 if let result = cal.date(from: comps), result > now {
@@ -767,6 +792,21 @@ struct VoiceCommandView: View {
             return extractIndonesianTime(from: timeStr, baseDate: baseDate) ?? baseDate
         }
         
+        // Match "pukul X:XX"
+        let pukulPattern = #"pukul (\d{1,2})(?:[.:](\d{2}))?"#
+        if let match = text.range(of: pukulPattern, options: .regularExpression) {
+            let timeStr = String(text[match])
+            return extractIndonesianTime(from: timeStr, baseDate: baseDate) ?? baseDate
+        }
+        
+        // Match Japanese/Chinese Time: "X時" (Hour), "X時Y分" (Hour Minute), "午後X時" (PM Hour)
+        // Pattern: (Optional: Gozen/Gogo/Shangwu/Xiawu) + Number + Ji/Dian + (Optional: Number + Fun/Fen)
+        let cjkPattern = #"(午前|午後|上午|下午)?\s*(\d{1,2})\s*(?:時|点|點)(?:\s*(\d{1,2})\s*(?:分))?"#
+        if let match = text.range(of: cjkPattern, options: .regularExpression) {
+            let timeStr = String(text[match])
+            return extractCJKTime(from: timeStr, pattern: cjkPattern, baseDate: baseDate) ?? baseDate
+        }
+        
         // Match standalone "X pm" or "X am"
         let simplePattern = #"(\d{1,2})\s*(am|pm)"#
         if let match = text.range(of: simplePattern, options: .regularExpression) {
@@ -790,7 +830,9 @@ struct VoiceCommandView: View {
             minute = Int(text[minRange]) ?? 0
         }
         
-        // AM/PM
+        // AM/PM check
+        // Check standard capture group index for AM/PM if pattern supports it
+        // The pattern passed might vary, but usually AM/PM is the last group if present
         if match.numberOfRanges > 3, match.range(at: 3).location != NSNotFound, let ampmRange = Range(match.range(at: 3), in: text) {
             let ampm = text[ampmRange].lowercased()
             if ampm == "pm" && hour < 12 { hour += 12 }
@@ -804,28 +846,73 @@ struct VoiceCommandView: View {
     }
     
     private func extractIndonesianTime(from text: String, baseDate: Date) -> Date? {
-        guard let regex = try? NSRegularExpression(pattern: #"jam (\d{1,2})(?:[.:](\d{2}))?(?:\s*(pagi|siang|sore|malam))?"#, options: .caseInsensitive) else { return nil }
+        // Simple extraction for "jam 5 sore" or "jam 14.30"
+        // Try to find digits
+        let digitsPattern = #"(\d{1,2})(?:[.:](\d{2}))?"#
+        guard let regex = try? NSRegularExpression(pattern: digitsPattern) else { return nil }
         let nsrange = NSRange(text.startIndex..., in: text)
         guard let match = regex.firstMatch(in: text, range: nsrange) else { return nil }
         
-        guard let hourRange = Range(match.range(at: 1), in: text), var hour = Int(text[hourRange]) else { return nil }
+        let hourRange = Range(match.range(at: 1), in: text)
+        guard let hourStr = hourRange.map({ String(text[$0]) }), var hour = Int(hourStr) else { return nil }
         
         var minute = 0
         if match.range(at: 2).location != NSNotFound, let minRange = Range(match.range(at: 2), in: text) {
             minute = Int(text[minRange]) ?? 0
         }
         
-        // Indonesian time of day
-        if match.range(at: 3).location != NSNotFound, let todRange = Range(match.range(at: 3), in: text) {
-            let tod = text[todRange].lowercased()
-            switch tod {
-            case "sore": if hour < 12 { hour += 12 } // 3 sore = 15:00
-            case "malam": if hour < 12 { hour += 12 } // 8 malam = 20:00
-            case "siang": if hour < 12 && hour != 12 { hour += 0 } // 12 siang stays 12
-            case "pagi": break // morning hours stay as-is
-            default: break
+        // Check for PM keywords
+        let lowerText = text.lowercased()
+        if (lowerText.contains("sore") || lowerText.contains("malam") || lowerText.contains("siang")) && hour < 12 {
+            // Special case for "siang": 11 siang is 11, 12 siang is 12, 1 siang is 13.
+            if lowerText.contains("siang") && hour == 12 {
+                // leave as 12
+            } else if lowerText.contains("siang") && hour < 11 {
+                // assume afternoon if it's like "2 siang" -> 14
+                 hour += 12
+            } else {
+                 hour += 12 // sore/malam always PM
             }
         }
+        
+        // Check for AM keywords
+        if lowerText.contains("pagi") && hour == 12 {
+            hour = 0
+        }
+        
+        var comps = Calendar.current.dateComponents([.year, .month, .day], from: baseDate)
+        comps.hour = hour
+        comps.minute = minute
+        return Calendar.current.date(from: comps)
+    }
+    
+    private func extractCJKTime(from text: String, pattern: String, baseDate: Date) -> Date? {
+        // Group 1: Modifier (Optional) - Gozen/Gogo/Shangwu/Xiawu
+        // Group 2: Hour
+        // Group 3: Minute (Optional)
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { return nil }
+        let nsrange = NSRange(text.startIndex..., in: text)
+        guard let match = regex.firstMatch(in: text, range: nsrange) else { return nil }
+        
+        var isPM = false
+        var isAM = false
+        
+        if match.range(at: 1).location != NSNotFound, let modRange = Range(match.range(at: 1), in: text) {
+            let modifier = String(text[modRange])
+            if ["午後", "下午"].contains(modifier) { isPM = true }
+            if ["午前", "上午"].contains(modifier) { isAM = true }
+        }
+        
+        let hourRange = Range(match.range(at: 2), in: text)
+        guard let hourStr = hourRange.map({ String(text[$0]) }), var hour = Int(hourStr) else { return nil }
+        
+        var minute = 0
+        if match.range(at: 3).location != NSNotFound, let minRange = Range(match.range(at: 3), in: text) {
+            minute = Int(text[minRange]) ?? 0
+        }
+        
+        if isPM && hour < 12 { hour += 12 }
+        if isAM && hour == 12 { hour = 0 }
         
         var comps = Calendar.current.dateComponents([.year, .month, .day], from: baseDate)
         comps.hour = hour
