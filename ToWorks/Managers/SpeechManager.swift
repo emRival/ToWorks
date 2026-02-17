@@ -71,18 +71,33 @@ class SpeechManager: ObservableObject {
     }
     
     func startRecording() {
-        // Refresh recognizer with current language
-        guard let recognizer = SFSpeechRecognizer(locale: resolvedLocale) else {
+        // 1. Check if language is supported on this device
+        let locale = resolvedLocale
+        if !SFSpeechRecognizer.supportedLocales().contains(locale) {
+            self.error = "Language \(locale.identifier) is not supported on this device."
+            return
+        }
+        
+        // 2. Initialize Recognizer
+        guard let recognizer = SFSpeechRecognizer(locale: locale) else {
             self.error = "Voice language not supported on this device"
             return
         }
+        
+        if !recognizer.isAvailable {
+            self.error = "Speech recognizer is not available right now"
+            return
+        }
+        
         speechRecognizer = recognizer
         
+        // 3. Clean up previous task if any
         if recognitionTask != nil {
             recognitionTask?.cancel()
             recognitionTask = nil
         }
         
+        // 4. Configure Audio Session
         let audioSession = AVAudioSession.sharedInstance()
         do {
             try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
@@ -103,7 +118,10 @@ class SpeechManager: ObservableObject {
         
         recognitionRequest.shouldReportPartialResults = true
         
-        recognitionTask = speechRecognizer?.recognitionTask(with: recognitionRequest) { result, error in
+        // 5. Keep reference to task
+        recognitionTask = speechRecognizer?.recognitionTask(with: recognitionRequest) { [weak self] result, error in
+            guard let self = self else { return }
+            
             var isFinal = false
             
             if let result = result {
@@ -126,7 +144,12 @@ class SpeechManager: ObservableObject {
             }
         }
         
+        // 6. Install Tap on Audio Engine
         let recordingFormat = inputNode.outputFormat(forBus: 0)
+        
+        // Safety check: remove tap if it already exists (prevents crash)
+        inputNode.removeTap(onBus: 0)
+        
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { (buffer, when) in
             self.recognitionRequest?.append(buffer)
         }
@@ -137,6 +160,7 @@ class SpeechManager: ObservableObject {
             try audioEngine.start()
             isRecording = true
             recognizedText = activeLanguage.listeningText
+            self.error = nil // Clear previous errors
         } catch {
             self.error = "audioEngine couldn't start because of an error."
         }
@@ -144,7 +168,7 @@ class SpeechManager: ObservableObject {
     
     func stopRecording() {
         audioEngine.stop()
-        audioEngine.inputNode.removeTap(onBus: 0)
+        audioEngine.inputNode.removeTap(onBus: 0) // Critical for avoiding overload
         recognitionRequest?.endAudio()
         recognitionRequest = nil
         recognitionTask?.cancel()
