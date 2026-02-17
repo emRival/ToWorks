@@ -589,9 +589,10 @@ struct VoiceCommandView: View {
             // Global Time Patterns
             #"(?i)(?:at|jam|pukul|à|um|as|alle|в|saat|lúc)\s+(\d{1,2})(?:[.:](\d{2}))?(?:\s*(am|pm|pagi|siang|sore|malam|du matin|de l'après-midi|domani|manhã|tarde|sabah|akşam|sáng|chiều))?"#,
             #"(?i)(\d{1,2})(?:[.:](\d{2}))?\s*(am|pm|h|heures|uhr|horas|baje|โมง|giờ|시|点|點|時)"#,
-            // CJK Clean patterns
+            // CJK Clean patterns (Simplified to avoid complexity issues)
             #"\s*明日"#, #"\s*明天"#, #"\s*明後日"#, #"\s*后天"#, #"\s*来週"#, #"\s*下周"#,
-            #"(午前|午後|朝|夜|深夜|夕方|上午|下午|早上|晚上|中午|凌晨|오전|오후|아침|저녁|밤|새벽)?\s*(\d{1,2})\s*(?:時|点|點|시)(?:\s*(\d{1,2})\s*(?:分|분))?(?:に|へ|에|から|まで|부터|まで)?"#
+            // Match time pattern with optional prefix/suffix but simplified groups
+            #"(?:午前|午後|朝|夜|深夜|夕方|上午|下午|早上|晚上|中午|凌晨|오전|오후|아침|저녁|밤|새벽)?\s*\d{1,2}\s*(?:時|点|點|시)(?:\s*\d{1,2}\s*(?:分|분))?(?:에|に|へ|から|まで|부터)?"#
         ]
         for pattern in cleanPatterns {
             title = title.replacingOccurrences(of: pattern, with: "", options: .regularExpression, range: title.startIndex..<title.endIndex)
