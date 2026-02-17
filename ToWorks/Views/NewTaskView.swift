@@ -8,17 +8,20 @@
 import SwiftUI
 import SwiftData
 import PhotosUI
+import UniformTypeIdentifiers
 
 struct NewTaskView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) var dismiss
-    @StateObject private var localizationManager = LocalizationManager.shared
+    @EnvironmentObject var localizationManager: LocalizationManager
     
     @State private var title = ""
     @State private var category = "Inbox"
     @State private var priority = "Medium"
     @State private var dueDate = Date()
     @State private var hasReminder = false
+    
+    private let categories = ["Inbox", "Work", "Personal", "Admin", "Health", "Study"]
     
     // Extra Features
     @State private var location = ""
@@ -28,10 +31,11 @@ struct NewTaskView: View {
     @State private var fileName: String?
     @State private var fileData: Data?
     @State private var notes = ""
+    @State private var isImproving = false
     
     var body: some View {
         ZStack {
-            Color(hex: "F8F9FE").ignoresSafeArea()
+            Color(.systemGroupedBackground).ignoresSafeArea()
             
             VStack {
                 // Header
@@ -41,7 +45,7 @@ struct NewTaskView: View {
                             .font(.system(size: 16, weight: .bold))
                             .foregroundColor(.primary)
                             .padding(10)
-                            .background(Color.white)
+                            .background(Color(.secondarySystemGroupedBackground))
                             .clipShape(Circle())
                             .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 3)
                     }
@@ -53,107 +57,174 @@ struct NewTaskView: View {
                     
                     Spacer()
                     
-                    Button(action: {}) {
+                    Button(action: {
+                        guard !title.isEmpty || !notes.isEmpty else { return }
+                        isImproving = true
+                        HapticManager.shared.impact(style: .light)
+                        
+                        Task {
+                            // Run improvements in parallel for speed
+                            async let improvedTitle = AIManager.shared.improveText(title)
+                            async let improvedNotes = AIManager.shared.improveText(notes)
+                            
+                            let newTitle = await improvedTitle
+                            let newNotes = await improvedNotes
+                            
+                            DispatchQueue.main.async {
+                                withAnimation {
+                                    if !newTitle.isEmpty { title = newTitle }
+                                    if !newNotes.isEmpty { notes = newNotes }
+                                    isImproving = false
+                                    HapticManager.shared.notification(type: .success)
+                                }
+                            }
+                        }
+                    }) {
                         Image(systemName: "sparkles")
                             .font(.system(size: 16, weight: .bold))
                             .foregroundColor(.blue)
                             .padding(10)
                             .background(Color.blue.opacity(0.1))
                             .clipShape(Circle())
+                            .rotationEffect(.degrees(isImproving ? 360 : 0))
+                            .animation(isImproving ? Animation.linear(duration: 1).repeatForever(autoreverses: false) : .default, value: isImproving)
+                        }
                     }
-                }
                 .padding(.horizontal, 24)
                 .padding(.top, 20)
+                .padding(.bottom, 16)
+                .background(Material.ultraThinMaterial)
+                .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 32) {
-                        // Category Selection
+
+                        // Title Card
                         VStack(alignment: .leading, spacing: 12) {
-                            Text(LocalizationManager.shared.localized("CATEGORY"))
-                                .font(.system(size: 11, weight: .black))
+                            Text(LocalizationManager.shared.localized("Details"))
+                                .font(.caption)
+                                .fontWeight(.bold)
                                 .foregroundColor(.secondary)
-                                .tracking(1)
                             
-                            HStack(spacing: 12) {
-                                CategoryChip(title: LocalizationManager.shared.localized("Inbox"), icon: "tray.fill", isSelected: category == "Inbox") { category = "Inbox" }
-                                CategoryChip(title: LocalizationManager.shared.localized("Work"), icon: "briefcase.fill", isSelected: category == "Work") { category = "Work" }
-                                CategoryChip(title: LocalizationManager.shared.localized("Personal"), icon: "person.fill", isSelected: category == "Personal") { category = "Personal" }
-                            }
-                        }
-                        
-                        // Input Area
-                        VStack(alignment: .leading, spacing: 16) {
                             TextField(LocalizationManager.shared.localized("What needs to be done?"), text: $title, axis: .vertical)
-                                .font(.system(size: 26, weight: .bold, design: .rounded))
-                                .padding(24)
-                                .background(Color.white)
-                                .cornerRadius(24)
-                                .shadow(color: Color.black.opacity(0.03), radius: 10, x: 0, y: 5)
-                        }
-                        
-                        // Settings Row
-                        VStack(alignment: .leading, spacing: 20) {
-                            // Location Input
-                            VStack(alignment: .leading, spacing: 12) {
-                                Label(LocalizationManager.shared.localized("Location"), systemImage: "mappin.and.ellipse")
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundColor(.secondary)
-                                
-                                TextField(LocalizationManager.shared.localized("Add address or place..."), text: $location)
-                                    .padding(16)
-                                    .background(Color.white)
-                                    .cornerRadius(16)
-                                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black.opacity(0.05), lineWidth: 1))
-                            }
+                                .font(.system(size: 24, weight: .bold, design: .rounded))
+                                .padding(.vertical, 4)
                             
+                            Divider()
+                            
+                            // Category Scroll
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 12) {
+                                    ForEach(categories, id: \.self) { cat in
+                                        CategoryChip(title: cat, icon: categoryIcon(cat), isSelected: category == cat) {
+                                            category = cat
+                                            HapticManager.shared.selection()
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
+                        .padding(20)
+                        .background(Color(.secondarySystemGroupedBackground))
+                        .cornerRadius(24)
+                        .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 4)
+                        
+                        // Settings Card
+                        VStack(spacing: 0) {
+                            // Date
                             HStack {
-                                Label(LocalizationManager.shared.localized("Due Date"), systemImage: "calendar")
-                                    .font(.system(size: 16, weight: .semibold))
-                                Spacer()
+                                Image(systemName: "calendar")
+                                    .foregroundColor(.blue)
+                                    .frame(width: 24)
                                 DatePicker("", selection: $dueDate)
                                     .labelsHidden()
                             }
-                            .padding(20)
-                            .background(Color.white)
-                            .cornerRadius(20)
+                            .padding(16)
                             
+                            Divider().padding(.leading, 56)
+                            
+                            // Location
                             HStack {
-                                Label(LocalizationManager.shared.localized("Priority"), systemImage: "flag.fill")
-                                    .font(.system(size: 16, weight: .semibold))
-                                Spacer()
-                                Picker("", selection: $priority) {
-                                    Text(LocalizationManager.shared.localized("Low")).tag("Low")
-                                    Text(LocalizationManager.shared.localized("Medium")).tag("Medium")
-                                    Text(LocalizationManager.shared.localized("High")).tag("High")
-                                }
-                                .pickerStyle(.menu)
+                                Image(systemName: "mappin.and.ellipse")
+                                    .foregroundColor(.red)
+                                    .frame(width: 24)
+                                TextField(LocalizationManager.shared.localized("Add location..."), text: $location)
                             }
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 12)
-                            .background(Color.white)
-                            .cornerRadius(20)
+                            .padding(16)
                             
-                            Toggle(isOn: $hasReminder) {
-                                Label(LocalizationManager.shared.localized("Set Reminder"), systemImage: "bell.fill")
-                                    .font(.system(size: 16, weight: .semibold))
+                            Divider().padding(.leading, 56)
+                            
+                            // Priority
+                            HStack {
+                                Image(systemName: "flag.fill")
+                                    .foregroundColor(.orange)
+                                    .frame(width: 24)
+                                Text("Priority")
+                                Spacer()
+                                Picker("Priority", selection: $priority) {
+                                    Text("Low").tag("Low")
+                                    Text("Medium").tag("Medium")
+                                    Text("High").tag("High")
+                                }
+                                .labelsHidden()
                             }
-                            .padding(20)
-                            .background(Color.white)
-                            .cornerRadius(20)
+                            .padding(16)
+                            
+                            Divider().padding(.leading, 56)
+                            
+                            // Reminder
+                            Toggle(isOn: $hasReminder) {
+                                HStack {
+                                    Image(systemName: "bell.fill")
+                                        .foregroundColor(.purple)
+                                        .frame(width: 24)
+                                    Text("Remind me")
+                                }
+                            }
+                            .padding(16)
                             .tint(.blue)
                         }
+                        .background(Color(.secondarySystemGroupedBackground))
+                        .cornerRadius(24)
+                        .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 4)
                         
-                        // Attachments Section
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text(LocalizationManager.shared.localized("ATTACHMENTS"))
-                                .font(.system(size: 11, weight: .black))
+                        // Notes Card
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text(LocalizationManager.shared.localized("Notes"))
+                                .font(.caption)
+                                .fontWeight(.bold)
                                 .foregroundColor(.secondary)
-                                .tracking(1)
                             
-                            HStack(spacing: 16) {
-                                // Image Picker
-                                PhotosPicker(selection: $selectedImageItem, matching: .images) {
-                                    VStack(spacing: 8) {
+                            ZStack(alignment: .topLeading) {
+                                if notes.isEmpty {
+                                    Text(LocalizationManager.shared.localized("Add description..."))
+                                        .foregroundColor(.secondary)
+                                        .padding(.top, 8)
+                                        .padding(.leading, 5)
+                                }
+                                TextEditor(text: $notes)
+                                    .frame(minHeight: 120)
+                                    .scrollContentBackground(.hidden)
+                                    .background(Color.clear)
+                            }
+                        }
+                        .padding(20)
+                        .background(Color(.secondarySystemGroupedBackground))
+                        .cornerRadius(24)
+                        .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 4)
+                        
+                        // Attachments Card
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text(LocalizationManager.shared.localized("Attachments"))
+                                .font(.caption)
+                                .fontWeight(.bold)
+                                .foregroundColor(.secondary)
+                            
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 12) {
+                                    // Photo Picker
+                                    PhotosPicker(selection: $selectedImageItem, matching: .images) {
                                         if let imageData, let uiImage = UIImage(data: imageData) {
                                             Image(uiImage: uiImage)
                                                 .resizable()
@@ -161,60 +232,63 @@ struct NewTaskView: View {
                                                 .frame(width: 80, height: 80)
                                                 .clipShape(RoundedRectangle(cornerRadius: 12))
                                         } else {
-                                            Image(systemName: "photo.on.rectangle")
-                                                .font(.system(size: 24))
-                                                .foregroundColor(.blue)
-                                                .frame(width: 80, height: 80)
-                                                .background(Color.blue.opacity(0.1))
-                                                .cornerRadius(12)
-                                        }
-                                        Text(LocalizationManager.shared.localized("Image"))
-                                            .font(.caption2)
-                                            .fontWeight(.bold)
-                                    }
-                                }
-                                .onChange(of: selectedImageItem) { _, newItem in
-                                    Task {
-                                        if let data = try? await newItem?.loadTransferable(type: Data.self) {
-                                            imageData = data
-                                        }
-                                    }
-                                }
-                                
-                                // File Picker
-                                Button(action: { showFilePicker = true }) {
-                                    VStack(spacing: 8) {
-                                        Image(systemName: fileData != nil ? "doc.fill" : "doc.badge.plus")
-                                            .font(.system(size: 24))
-                                            .foregroundColor(fileData != nil ? .green : .blue)
+                                            VStack {
+                                                Image(systemName: "photo")
+                                                    .font(.title2)
+                                                Text("Photo")
+                                                    .font(.caption2)
+                                                    .fontWeight(.bold)
+                                            }
+                                            .foregroundColor(.blue)
                                             .frame(width: 80, height: 80)
-                                            .background(fileData != nil ? Color.green.opacity(0.1) : Color.blue.opacity(0.1))
+                                            .background(Color.blue.opacity(0.1))
                                             .cornerRadius(12)
-                                        
-                                        Text(fileName ?? LocalizationManager.shared.localized("File"))
-                                            .font(.caption2)
-                                            .fontWeight(.bold)
-                                            .lineLimit(1)
+                                        }
                                     }
-                                    .frame(width: 80)
+                                    .onChange(of: selectedImageItem) { _, newItem in
+                                        Task {
+                                            if let data = try? await newItem?.loadTransferable(type: Data.self) {
+                                                imageData = data
+                                            }
+                                        }
+                                    }
+                                    
+                                    // File Picker
+                                    Button(action: { showFilePicker = true }) {
+                                        if let _ = fileData {
+                                            VStack {
+                                                Image(systemName: "doc.fill")
+                                                    .font(.title2)
+                                                Text("File")
+                                                    .font(.caption2)
+                                                    .fontWeight(.bold)
+                                            }
+                                            .foregroundColor(.green)
+                                            .frame(width: 80, height: 80)
+                                            .background(Color.green.opacity(0.1))
+                                            .cornerRadius(12)
+                                        } else {
+                                            VStack {
+                                                Image(systemName: "folder")
+                                                    .font(.title2)
+                                                Text("File")
+                                                    .font(.caption2)
+                                                    .fontWeight(.bold)
+                                            }
+                                            .foregroundColor(.orange)
+                                            .frame(width: 80, height: 80)
+                                            .background(Color.orange.opacity(0.1))
+                                            .cornerRadius(12)
+                                        }
+                                    }
                                 }
+                                .padding(.vertical, 4)
                             }
                         }
-                        
-                        // Notes Section
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text(LocalizationManager.shared.localized("NOTES"))
-                                .font(.system(size: 11, weight: .black))
-                                .foregroundColor(.secondary)
-                                .tracking(1)
-                            
-                            TextEditor(text: $notes)
-                                .frame(minHeight: 100)
-                                .padding(16)
-                                .background(Color.white)
-                                .cornerRadius(20)
-                                .shadow(color: Color.black.opacity(0.02), radius: 5, x: 0, y: 2)
-                        }
+                        .padding(20)
+                        .background(Color(.secondarySystemGroupedBackground))
+                        .cornerRadius(24)
+                        .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 4)
                     }
                     .padding(24)
                 }
@@ -258,6 +332,18 @@ struct NewTaskView: View {
     private func hideKeyboard() {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
+    
+    private func categoryIcon(_ category: String) -> String {
+        switch category {
+        case "Inbox": return "tray.fill"
+        case "Work": return "briefcase.fill"
+        case "Personal": return "person.fill"
+        case "Admin": return "folder.fill"
+        case "Health": return "heart.fill"
+        case "Study": return "book.fill"
+        default: return "tag.fill"
+        }
+    }
 
     private func addTask() {
         let newItem = TodoItem(
@@ -281,18 +367,8 @@ struct NewTaskView: View {
                 title: title,
                 dueDate: dueDate
             )
-            
-            // Save records for notification history
-            let reminderMinutes = UserDefaults.standard.integer(forKey: "reminderMinutes")
-            let mins = reminderMinutes > 0 ? reminderMinutes : 5
-            
-            if let beforeDate = Calendar.current.date(byAdding: .minute, value: -mins, to: dueDate), beforeDate > Date() {
-                modelContext.insert(NotificationRecord(title: "⏰ Upcoming: \(title)", body: "Starting in \(mins) minutes!", timestamp: beforeDate))
-            }
-            modelContext.insert(NotificationRecord(title: "🔔 Reminder: \(title)", body: "Your task is due now!", timestamp: dueDate))
-            if let afterDate = Calendar.current.date(byAdding: .minute, value: mins, to: dueDate) {
-                modelContext.insert(NotificationRecord(title: "📋 Follow up: \(title)", body: "Did you complete this task?", timestamp: afterDate))
-            }
+            // NotificationRecord history is now auto-saved by NotificationManager
+            // when each notification fires (willPresent delegate).
         }
         
         dismiss()
@@ -315,7 +391,7 @@ struct CategoryChip: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .background(isSelected ? Color.blue : Color.white)
+            .background(isSelected ? Color.blue : Color(.secondarySystemGroupedBackground))
             .foregroundColor(isSelected ? .white : .primary)
             .cornerRadius(15)
             .shadow(color: isSelected ? Color.blue.opacity(0.3) : Color.black.opacity(0.05), radius: 5, x: 0, y: 3)

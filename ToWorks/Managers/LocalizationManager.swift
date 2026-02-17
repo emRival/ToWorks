@@ -52,6 +52,28 @@ class LocalizationManager: ObservableObject {
             "All caught up!": "Semua selesai!",
             "Enjoy your free time or add a new task to get started.": "Nikmati waktu luang atau tambah tugas baru.",
             "UP NEXT": "BERIKUTNYA",
+            "See All": "Lihat Semua",
+            "Good Morning,": "Selamat Pagi,",
+            "Search for task...": "Cari tugas...",
+            
+            // Stats
+            "PERFORMANCE": "PERFORMA",
+            "Insights": "Wawasan",
+            "Great Job!": "Kerja Bagus!",
+            "Completion": "Penyelesaian",
+            "Total Done": "Selesai",
+            "Pending": "Tunda",
+            "Weekly Activity": "Aktivitas Mingguan",
+            "Attention Needed": "Perhatian Diperlukan",
+            "You have %d overdue tasks.": "Anda memiliki %d tugas terlambat.",
+            "You have completed %d%% of your tasks this %@.": "Anda telah menyelesaikan %1$d%% tugas Anda %2$@ ini.",
+            // Periods
+            "Week": "Minggu",
+            "Month": "Bulan",
+            "All": "Semua",
+            "week": "minggu",
+            "month": "bulan",
+            "all": "semua",
             
             // Settings
             "PREFERENCES": "PREFERENSI",
@@ -96,7 +118,51 @@ class LocalizationManager: ObservableObject {
             "Study": "Belajar",
             "Low": "Rendah",
             "Medium": "Sedang",
-            "High": "Tinggi"
+            "High": "Tinggi",
+            
+            // Task Detail
+            "Task Details": "Detail Tugas",
+            "TASK TITLE": "JUDUL TUGAS",
+            "Enter title...": "Masukkan judul...",
+            "Completed": "Selesai",
+            "STATUS": "STATUS",
+            "PRIORITY": "PRIORITAS",
+            "Remind Me": "Ingatkan Saya",
+            "Reminder Time": "Waktu Pengingat",
+            "At time of event": "Saat acara",
+            "Add Location": "Tambah Lokasi",
+            "Delete Task": "Hapus Tugas",
+            "Add Attachment": "Tambah Lampiran",
+            "Add notes here...": "Tambah catatan di sini...",
+            "Add desciption...": "Tambah deskripsi...",
+            
+            // New Task Specific
+            "Details": "Rincian",
+            "Photo": "Foto",
+            
+            // Dashboard Greetings
+            "Good Afternoon,": "Selamat Siang,",
+            "Good Evening,": "Selamat Malam,",
+            
+            // Onboarding
+            "Welcome to ToWorks": "Selamat Datang di ToWorks",
+            "Let's get productive. First, what should we call you?": "Mari produktif. Pertama, siapa nama Anda?",
+            "YOUR NAME": "NAMA ANDA",
+            "Enter your first name": "Masukkan nama depan Anda",
+            "Get Started": "Mulai",
+            
+            // Notifications
+            "History": "Riwayat",
+            "No notifications yet": "Belum ada notifikasi",
+            "Test System Notification": "Uji Notifikasi Sistem",
+            "Clear All History": "Hapus Semua Riwayat",
+            "Done": "Selesai",
+            
+            // Voice Command
+            "VOICE COMMAND": "PERINTAH SUARA",
+            "Listening...": "Mendengarkan...",
+            "Parsed Task": "Tugas Terurai",
+            "Tap the mic to start": "Ketuk mikrofon untuk mulai"
         ],
         "ja-JP": [
             "Home": "ホーム",
@@ -112,6 +178,26 @@ class LocalizationManager: ObservableObject {
             "All caught up!": "すべて完了！",
             "Enjoy your free time or add a new task to get started.": "自由な時間を楽しむか、新しいタスクを追加してください。",
             "UP NEXT": "次は",
+            "See All": "すべて見る",
+            "Good Morning,": "おはようございます、",
+            "Search for task...": "タスクを検索...",
+            
+            "PERFORMANCE": "パフォーマンス",
+            "Insights": "インサイト",
+            "Great Job!": "よくできました！",
+            "Completion": "完了率",
+            "Total Done": "完了",
+            "Pending": "保留",
+            "Weekly Activity": "週間アクティビティ",
+            "Attention Needed": "要注意",
+            "You have %d overdue tasks.": "%d 件の期限切れタスクがあります。",
+            "You have completed %d%% of your tasks this %@.": "今%2$@のタスクの%1$d%%を完了しました。",
+            "Week": "週",
+            "Month": "月",
+            "All": "全期間",
+            "week": "週",
+            "month": "月",
+            "all": "期間",
             
             "PREFERENCES": "環境設定",
             "Appearance": "外観",
@@ -137,7 +223,7 @@ class LocalizationManager: ObservableObject {
             "CATEGORY": "カテゴリ",
             "What needs to be done?": "今のタスクは？",
             "Location": "場所",
-            "Add address or place...": "住所や場所を追加...",
+            "Add address or place...": "住所を追加...",
             "Due Date": "期限",
             "Priority": "優先度",
             "Set Reminder": "リマインダー設定",
@@ -154,7 +240,51 @@ class LocalizationManager: ObservableObject {
             "Study": "勉強",
             "Low": "低",
             "Medium": "中",
-            "High": "高"
+            "High": "高",
+            
+             // Task Detail
+            "Task Details": "タスク詳細",
+            "TASK TITLE": "タスク名",
+            "Enter title...": "タイトルを入力...",
+            "Completed": "完了",
+            "STATUS": "ステータス",
+            "Remind Me": "リマインダー",
+            "Reminder Time": "通知時間",
+            "At time of event": "イベント時",
+            "Add Location": "場所を追加",
+            "Delete Task": "タスクを削除",
+            "Add Attachment": "添付を追加",
+            "Add notes here...": "メモを追加...",
+             "Add desciption...": "説明を追加...",
+            
+            // New Task Specific
+            "Details": "詳細",
+            "Photo": "写真",
+            "PRIORITY": "優先度",
+            
+            // Dashboard Greetings
+            "Good Afternoon,": "こんにちは、",
+            "Good Evening,": "こんばんは、",
+            
+            // Onboarding
+            "Welcome to ToWorks": "ToWorksへようこそ",
+            "Let's get productive. First, what should we call you?": "生産的になりましょう。まず、お名前は？",
+            "YOUR NAME": "お名前",
+            "Enter your first name": "名前を入力",
+            "Get Started": "始める",
+            
+            // Notifications
+            "History": "履歴",
+            "No notifications yet": "通知はまだありません",
+            "Test System Notification": "テスト通知を送信",
+            "Clear All History": "履歴をすべて削除",
+            "Done": "完了",
+            
+            // Voice Command
+            "VOICE COMMAND": "音声コマンド",
+            "Listening...": "聞いています...",
+            "Parsed Task": "解析済みタスク",
+            "Tap the mic to start": "マイクをタップして開始"
         ],
         "en-US": [:] // Default fallbacks to key itself
     ]
@@ -166,5 +296,10 @@ class LocalizationManager: ObservableObject {
             return value
         }
         return key
+    }
+    
+    func localizedWithFormat(_ key: String, _ args: CVarArg...) -> String {
+        let format = localized(key)
+        return String(format: format, arguments: args)
     }
 }

@@ -12,6 +12,7 @@ extension Color {
     static let backgroundDark = Color(uiColor: .systemBackground)
     static let primaryApp = Color.blue
     static let secondaryApp = Color.gray
+    static let cardBackground = Color(uiColor: .secondarySystemGroupedBackground)
 }
 
 // MARK: - Hex Initializer

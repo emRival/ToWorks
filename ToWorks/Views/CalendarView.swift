@@ -9,6 +9,7 @@ import SwiftUI
 import SwiftData
 
 struct CalendarView: View {
+    @EnvironmentObject var localizationManager: LocalizationManager
     @Query(sort: \TodoItem.timestamp, order: .forward) private var items: [TodoItem]
     @State private var selectedDate = Date()
     @State private var displayedMonth = Date()
@@ -142,8 +143,8 @@ struct CalendarView: View {
                             .foregroundColor(.accentColor.opacity(0.85))
                             .textCase(.uppercase)
                             .kerning(1.1)
-                        Text("Calendar")
-                            .font(.system(size: 26, weight: .black, design: .rounded))
+                        Text(LocalizationManager.shared.localized("Calendar"))
+                            .font(.system(size: 32, weight: .bold, design: .rounded))
                             .foregroundColor(.primary)
                     }
                     
@@ -180,9 +181,10 @@ struct CalendarView: View {
                     }
                 }
                 .padding(.horizontal, 20)
-                .padding(.top, safeTop + 6)
-                .padding(.bottom, 10)
-                .background(Color.backgroundLight)
+                .padding(.top, safeTop + 16)
+                .padding(.bottom, 16)
+                .background(Material.ultraThinMaterial)
+                .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
                 .transition(.opacity)
             }
         }

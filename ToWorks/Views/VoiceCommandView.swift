@@ -57,7 +57,7 @@ struct VoiceCommandView: View {
                         Circle()
                             .fill(speechManager.isRecording ? Color.red : Color.green)
                             .frame(width: 6, height: 6)
-                        Text("VOICE COMMAND")
+                        Text(LocalizationManager.shared.localized("VOICE COMMAND"))
                             .font(.system(size: 11, weight: .heavy))
                             .kerning(1.5)
                             .foregroundColor(.white.opacity(0.5))
@@ -160,7 +160,7 @@ struct VoiceCommandView: View {
                 // Transcription & Parsed Result
                 VStack(spacing: 12) {
                     if speechManager.isRecording {
-                        Text(speechManager.recognizedText.isEmpty ? "Listening..." : speechManager.recognizedText)
+                        Text(speechManager.recognizedText.isEmpty ? LocalizationManager.shared.localized("Listening...") : speechManager.recognizedText)
                             .font(.system(size: 20, weight: .semibold, design: .rounded))
                             .foregroundColor(.white)
                             .multilineTextAlignment(.center)
@@ -169,7 +169,7 @@ struct VoiceCommandView: View {
                     } else if showResult && !parsedTitle.isEmpty {
                         // Show parsed result
                         VStack(spacing: 14) {
-                            Text("Parsed Task")
+                            Text(LocalizationManager.shared.localized("Parsed Task"))
                                 .font(.system(size: 11, weight: .heavy))
                                 .kerning(1)
                                 .foregroundColor(.blue.opacity(0.7))
@@ -251,7 +251,7 @@ struct VoiceCommandView: View {
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 24)
                     } else {
-                        Text("Tap the mic to start")
+                        Text(LocalizationManager.shared.localized("Tap the mic to start"))
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(.white.opacity(0.3))
                     }
@@ -269,7 +269,7 @@ struct VoiceCommandView: View {
                         HStack(spacing: 8) {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 18))
-                            Text("Create Task")
+                            Text(LocalizationManager.shared.localized("Create Task"))
                                 .font(.system(size: 16, weight: .bold))
                         }
                         .foregroundColor(.white)
@@ -356,6 +356,7 @@ struct VoiceCommandView: View {
                         ForEach(VoiceLanguage.allLanguages) { lang in
                             Button {
                                 speechManager.setLanguage(lang)
+                                LocalizationManager.shared.languageDidChange() // Trigger Propagation
                                 showLanguagePicker = false
                             } label: {
                                 HStack(spacing: 10) {
@@ -391,11 +392,11 @@ struct VoiceCommandView: View {
                     .padding(16)
                 }
                 .background(Color(.systemGroupedBackground))
-                .navigationTitle("Voice Language")
+                .navigationTitle(LocalizationManager.shared.localized("Voice Language"))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("Done") { showLanguagePicker = false }
+                        Button(LocalizationManager.shared.localized("Done")) { showLanguagePicker = false }
                     }
                 }
             }

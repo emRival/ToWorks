@@ -16,9 +16,9 @@ struct NotificationListView: View {
     var body: some View {
         NavigationView {
             List {
-                Section(header: Text("History")) {
+                Section(header: Text(LocalizationManager.shared.localized("History"))) {
                     if notifications.isEmpty {
-                        Text("No notifications yet")
+                        Text(LocalizationManager.shared.localized("No notifications yet"))
                             .foregroundColor(.secondary)
                     } else {
                         ForEach(notifications) { notification in
@@ -56,18 +56,18 @@ struct NotificationListView: View {
                 
                 Section {
                     Button(action: addTestNotification) {
-                        Label("Test System Notification", systemImage: "bell.badge.fill")
+                        Label(LocalizationManager.shared.localized("Test System Notification"), systemImage: "bell.badge.fill")
                     }
                     
                     if !notifications.isEmpty {
                         Button(role: .destructive, action: clearAll) {
-                            Label("Clear All History", systemImage: "trash")
+                            Label(LocalizationManager.shared.localized("Clear All History"), systemImage: "trash")
                         }
                     }
                 }
             }
-            .navigationTitle("Notifications")
-            .navigationBarItems(trailing: Button("Done") {
+            .navigationTitle(LocalizationManager.shared.localized("Notifications"))
+            .navigationBarItems(trailing: Button(LocalizationManager.shared.localized("Done")) {
                 dismiss()
             })
             .onAppear {

@@ -13,7 +13,7 @@ struct ContentView: View {
     @State private var showNewTaskSheet = false
     @State private var showVoiceCommand = false
     @State private var fabExpanded = false
-    @StateObject private var localizationManager = LocalizationManager.shared
+    @EnvironmentObject var localizationManager: LocalizationManager
     
     // Global settings — applied at root level
     @AppStorage("appearance") private var appearance = "System"
@@ -40,40 +40,22 @@ struct ContentView: View {
     
     var body: some View {
         ZStack(alignment: .bottom) {
-            TabView(selection: $selectedTab) {
-                NavigationStack {
-                    DashboardView()
-                }
-                .tag(0)
-                .tabItem {
-                    Label(LocalizationManager.shared.localized("Home"), systemImage: "square.grid.2x2")
-                }
-                
-                NavigationStack {
-                    CalendarView()
-                }
-                .tag(1)
-                .tabItem {
-                    Label(LocalizationManager.shared.localized("Calendar"), systemImage: "calendar")
-                }
-                
-                NavigationStack {
-                    StatsView()
-                }
-                .tag(2)
-                .tabItem {
-                    Label(LocalizationManager.shared.localized("Stats"), systemImage: "chart.bar")
-                }
-                
-                NavigationStack {
-                    SettingsView()
-                }
-                .tag(3)
-                .tabItem {
-                    Label(LocalizationManager.shared.localized("Settings"), systemImage: "gearshape")
+            // Main Content
+            Group {
+                switch selectedTab {
+                case 0:
+                    NavigationStack { DashboardView() }
+                case 1:
+                    NavigationStack { CalendarView() }
+                case 2:
+                    NavigationStack { StatsView() }
+                case 3:
+                    NavigationStack { SettingsView() }
+                default:
+                    NavigationStack { DashboardView() }
                 }
             }
-            .tint(appAccentColor)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             
             // Dim overlay when FAB expanded
             if fabExpanded {
@@ -85,96 +67,78 @@ struct ContentView: View {
                         }
                     }
                     .transition(.opacity)
+                    .zIndex(1)
             }
             
-            // FAB Stack
-            VStack(spacing: 12) {
-                if fabExpanded {
-                        // Voice Command
-                    Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            fabExpanded = false
+            // Custom Tab Bar & FAB
+            VStack(spacing: 0) {
+                Spacer()
+                
+                ZStack(alignment: .bottom) {
+                    // Floating Tab Bar
+                    CustomTabBar(selectedTab: $selectedTab, accentColor: appAccentColor, onFabTap: {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                            fabExpanded.toggle()
                         }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                            showVoiceCommand = true
+                    })
+                    
+                    // FAB Actions (When Expanded)
+                    if fabExpanded {
+                        VStack(spacing: 16) {
+                            // Voice Command
+                            Button {
+                                withAnimation { fabExpanded = false }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                    showVoiceCommand = true
+                                }
+                            } label: {
+                                actionButtonLabel(text: LocalizationManager.shared.localized("Voice"), icon: "mic.fill", color: .indigo)
+                            }
+                            .transition(.move(edge: .bottom).combined(with: .opacity).combined(with: .scale))
+                            
+                            // New Task
+                            Button {
+                                withAnimation { fabExpanded = false }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                    showNewTaskSheet = true
+                                }
+                            } label: {
+                                actionButtonLabel(text: LocalizationManager.shared.localized("New Task"), icon: "pencil.line", color: appAccentColor)
+                            }
+                            .transition(.move(edge: .bottom).combined(with: .opacity).combined(with: .scale))
+                        }
+                        .padding(.bottom, 80) // Push up above the FAB
+                        .zIndex(3)
+                    }
+                    
+                    // Main FAB Button (Centered on Tab Bar)
+                    Button {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                            fabExpanded.toggle()
                         }
                     } label: {
-                        HStack(spacing: 8) {
-                            Text(LocalizationManager.shared.localized("Voice"))
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundColor(.white)
-                            Image(systemName: "mic.fill")
-                                .font(.system(size: 15, weight: .bold))
-                                .foregroundColor(.white)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .background(
-                            Capsule()
-                                .fill(
+                        Image(systemName: "plus")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(width: 56, height: 56)
+                            .background(
+                                Circle().fill(
                                     LinearGradient(
-                                        colors: [.purple, .indigo],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
+                                        colors: fabExpanded ? [.red.opacity(0.9), .orange] : [appAccentColor, appAccentColor.opacity(0.7)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
                                     )
                                 )
-                        )
-                        .shadow(color: .purple.opacity(0.3), radius: 8, y: 4)
-                    }
-                    .transition(.move(edge: .bottom).combined(with: .opacity).combined(with: .scale))
-                    
-                    // New Task
-                    Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            fabExpanded = false
-                        }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                            showNewTaskSheet = true
-                        }
-                    } label: {
-                        HStack(spacing: 8) {
-                            Text(LocalizationManager.shared.localized("New Task"))
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundColor(.white)
-                            Image(systemName: "pencil.line")
-                                .font(.system(size: 15, weight: .bold))
-                                .foregroundColor(.white)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .background(
-                            Capsule().fill(appAccentColor)
-                        )
-                        .shadow(color: appAccentColor.opacity(0.3), radius: 8, y: 4)
-                    }
-                    .transition(.move(edge: .bottom).combined(with: .opacity).combined(with: .scale))
-                }
-                
-                // Main FAB button
-                Button {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
-                        fabExpanded.toggle()
-                    }
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundColor(.white)
-                        .frame(width: 56, height: 56)
-                        .background(
-                            Circle().fill(
-                                LinearGradient(
-                                    colors: fabExpanded ? [.red.opacity(0.9), .orange] : [appAccentColor, appAccentColor.opacity(0.7)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
                             )
-                        )
-                        .shadow(color: (fabExpanded ? Color.red : appAccentColor).opacity(0.3), radius: 12, y: 5)
-                        .rotationEffect(.degrees(fabExpanded ? 45 : 0))
+                            .shadow(color: (fabExpanded ? Color.red : appAccentColor).opacity(0.4), radius: 10, y: 5)
+                            .rotationEffect(.degrees(fabExpanded ? 45 : 0))
+                    }
+                    .offset(y: -28) // Pull up to float above tab bar
+                    .zIndex(4)
                 }
             }
-            .padding(.bottom, 60)
-            .animation(.spring(response: 0.35, dampingFraction: 0.7), value: fabExpanded)
+            .ignoresSafeArea(.keyboard)
+            .zIndex(2)
         }
         .sheet(isPresented: $showNewTaskSheet) {
             NewTaskView()
@@ -186,10 +150,25 @@ struct ContentView: View {
         .tint(appAccentColor)
         .preferredColorScheme(colorScheme)
     }
+    
+    // Helper View for FAB Actions
+    private func actionButtonLabel(text: String, icon: String, color: Color) -> some View {
+        HStack(spacing: 12) {
+            Text(text)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(.white)
+            
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .bold))
+                .foregroundColor(.white)
+                .frame(width: 44, height: 44)
+                .background(Circle().fill(color))
+                .shadow(color: color.opacity(0.4), radius: 8, y: 4)
+        }
+    }
 }
 
 #Preview {
     ContentView()
         .modelContainer(for: TodoItem.self, inMemory: true)
 }
-

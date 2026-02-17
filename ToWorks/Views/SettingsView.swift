@@ -13,7 +13,7 @@ import AudioToolbox
 struct SettingsView: View {
     @Query(sort: \TodoItem.timestamp) private var allItems: [TodoItem]
     @Environment(\.modelContext) private var modelContext
-    @StateObject private var localizationManager = LocalizationManager.shared
+    @EnvironmentObject var localizationManager: LocalizationManager
     
     // Appearance
     @AppStorage("appearance") private var appearance = "System"
@@ -57,13 +57,16 @@ struct SettingsView: View {
                             .foregroundColor(.accentColor.opacity(0.85))
                             .kerning(1.1)
                         Text(LocalizationManager.shared.localized("Settings"))
-                            .font(.system(size: 26, weight: .black, design: .rounded))
+                            .font(.system(size: 32, weight: .bold, design: .rounded))
                     }
                     Spacer()
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 24)
                 .padding(.top, 16)
-                .padding(.bottom, 12)
+                .padding(.bottom, 16)
+                .background(Material.ultraThinMaterial)
+                .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+                .padding(.bottom, 8)
                 
                 List {
                     // MARK: - Profile
@@ -147,9 +150,26 @@ struct SettingsView: View {
                             
                             HStack {
                                 settingIcon("mic.fill", color: .purple)
-                                Picker(LocalizationManager.shared.localized("Voice Language"), selection: $voiceLanguage) {
-                                    ForEach(VoiceLanguage.allLanguages) { lang in
-                                        Text("\(lang.flag) \(lang.name)").tag(lang.id)
+                                Text(LocalizationManager.shared.localized("Voice Language"))
+                                Spacer()
+                                Menu {
+                                    Picker("Voice Language", selection: $voiceLanguage) {
+                                        ForEach(VoiceLanguage.allLanguages) { lang in
+                                            Text("\(lang.flag) \(lang.name)").tag(lang.id)
+                                        }
+                                    }
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        if let lang = VoiceLanguage.allLanguages.first(where: { $0.id == voiceLanguage }) {
+                                            Text(lang.name)
+                                                .foregroundColor(.secondary)
+                                        } else {
+                                            Text(voiceLanguage)
+                                                .foregroundColor(.secondary)
+                                        }
+                                        Image(systemName: "chevron.up.chevron.down")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
                                     }
                                 }
                             }
@@ -244,6 +264,9 @@ struct SettingsView: View {
                 }
                 .listStyle(.insetGrouped)
                 .scrollContentBackground(.hidden)
+                .safeAreaInset(edge: .bottom) {
+                    Spacer().frame(height: 100)
+                }
             }
             
             // Deletion banner

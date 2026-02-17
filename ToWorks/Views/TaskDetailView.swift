@@ -12,13 +12,26 @@ struct TaskDetailView: View {
     @Bindable var item: TodoItem
     @Environment(\.dismiss) var dismiss
     @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject var localizationManager: LocalizationManager
+    @AppStorage("accentColorChoice") private var accentColorChoice = "Blue"
+    
+    private var accentColor: Color {
+        switch accentColorChoice {
+        case "Purple": return .purple
+        case "Orange": return .orange
+        case "Green": return .green
+        case "Red": return .red
+        case "Pink": return .pink
+        default: return .blue
+        }
+    }
     
     var body: some View {
         ZStack {
             Color.backgroundLight.ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // Header
+                // Header — Liquid Glass
                 HStack {
                     Button(action: { dismiss() }) {
                         Image(systemName: "arrow.left")
@@ -32,14 +45,13 @@ struct TaskDetailView: View {
                     
                     Spacer()
                     
-                    Text("Task Details")
+                    Text(LocalizationManager.shared.localized("Task Details"))
                         .font(.headline)
                         .fontWeight(.bold)
                     
                     Spacer()
                     
                     Button(action: {
-                        // Delete or Edit action
                         deleteItem()
                     }) {
                         Image(systemName: "trash")
@@ -54,208 +66,300 @@ struct TaskDetailView: View {
                 .padding(.horizontal)
                 .padding(.top)
                 .padding(.bottom, 20)
+                .background(Material.ultraThinMaterial)
+                .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
                 
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
-                        // Title Section
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("TITLE")
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 20) {
+                        // Title Card
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text(LocalizationManager.shared.localized("TASK TITLE"))
                                 .font(.caption)
                                 .fontWeight(.bold)
                                 .foregroundColor(.secondary)
                             
-                            TextField("Task Title", text: $item.title)
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .padding()
-                                .background(Color(.secondarySystemGroupedBackground))
-                                .cornerRadius(12)
+                            TextField(LocalizationManager.shared.localized("Enter title..."), text: $item.title, axis: .vertical)
+                                .font(.system(size: 24, weight: .bold, design: .rounded))
+                                .padding(.vertical, 4)
                         }
+                        .padding(20)
+                        .background(Color(.secondarySystemGroupedBackground))
+                        .cornerRadius(24)
+                        .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 4)
                         
-                        // Status & Priority
+                        // Status & Priority Grid
                         HStack(spacing: 16) {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("STATUS")
-                                    .font(.caption)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.secondary)
-                                
-                                Button(action: { 
+                            // Status Card
+                            Button(action: { 
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                                     item.isCompleted.toggle()
-                                    if item.isCompleted {
-                                        HapticManager.shared.notification(type: .success)
-                                    } else {
-                                        HapticManager.shared.impact(style: .light)
-                                    }
-                                }) {
-                                    HStack {
-                                        Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
-                                            .foregroundColor(item.isCompleted ? .green : .secondary)
-                                        Text(item.isCompleted ? "Completed" : "Pending")
-                                            .fontWeight(.medium)
-                                            .foregroundColor(.primary)
-                                    }
-                                    .padding()
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(Color(.secondarySystemGroupedBackground))
-                                    .cornerRadius(12)
                                 }
-                            }
-                            
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("PRIORITY")
-                                    .font(.caption)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.secondary)
-                                
-                                Picker("Priority", selection: $item.priority) {
-                                    Text("Low").tag("Low")
-                                    Text("Medium").tag("Medium")
-                                    Text("High").tag("High")
+                                if item.isCompleted {
+                                    HapticManager.shared.notification(type: .success)
+                                } else {
+                                    HapticManager.shared.impact(style: .light)
                                 }
-                                .pickerStyle(.menu)
-                                .padding()
-                                .frame(maxWidth: .infinity)
+                            }) {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
+                                        .font(.title2)
+                                        .foregroundColor(item.isCompleted ? .green : .secondary)
+                                    
+                                    Spacer()
+                                    
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(item.isCompleted ? LocalizationManager.shared.localized("Completed") : LocalizationManager.shared.localized("Pending"))
+                                            .font(.system(size: 16, weight: .bold))
+                                            .foregroundColor(item.isCompleted ? .green : .primary)
+                                        
+                                        Text(LocalizationManager.shared.localized("STATUS"))
+                                            .font(.caption)
+                                            .fontWeight(.bold)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                                .padding(16)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .frame(height: 130)
                                 .background(Color(.secondarySystemGroupedBackground))
-                                .cornerRadius(12)
+                                .cornerRadius(20)
+                                .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 4)
                             }
+                            .buttonStyle(PlainButtonStyle())
+                            
+                            // Priority Card
+                            VStack(alignment: .leading, spacing: 12) {
+                                Image(systemName: "flag.fill")
+                                    .font(.title2)
+                                    .foregroundColor(priorityColor(item.priority))
+                                
+                                Spacer()
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Picker(LocalizationManager.shared.localized("Priority"), selection: $item.priority) {
+                                        Text(LocalizationManager.shared.localized("Low")).tag("Low")
+                                        Text(LocalizationManager.shared.localized("Medium")).tag("Medium")
+                                        Text(LocalizationManager.shared.localized("High")).tag("High")
+                                    }
+                                    .labelsHidden()
+                                    .accentColor(priorityColor(item.priority))
+                                    
+                                    Text(LocalizationManager.shared.localized("PRIORITY"))
+                                        .font(.caption)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .padding(16)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(height: 130)
+                            .background(Color(.secondarySystemGroupedBackground))
+                            .cornerRadius(20)
+                            .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 4)
                         }
                         
-                        // Reminder Toggle
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("REMINDER")
-                                .font(.caption)
-                                .fontWeight(.bold)
-                                .foregroundColor(.secondary)
+                        // Details Card (Date, Reminder, Location)
+                        VStack(spacing: 0) {
+                            // Date Row
+                            HStack {
+                                Image(systemName: "calendar")
+                                    .foregroundColor(.blue)
+                                    .frame(width: 24)
+                                Text(LocalizationManager.shared.localized("Due Date"))
+                                    .fontWeight(.medium)
+                                Spacer()
+                                DatePicker("", selection: $item.timestamp, displayedComponents: [.date, .hourAndMinute])
+                                    .labelsHidden()
+                                    .onChange(of: item.timestamp) { _, _ in updateNotifications() }
+                            }
+                            .padding(16)
                             
+                            Divider().padding(.leading, 56)
+                            
+                            // Reminder Row
                             Toggle(isOn: $item.hasReminder) {
-                                Label("Enable Notifications", systemImage: item.hasReminder ? "bell.fill" : "bell.slash")
+                                HStack {
+                                    Image(systemName: "bell.fill")
+                                        .foregroundColor(.orange)
+                                        .frame(width: 24)
+                                    Text(LocalizationManager.shared.localized("Remind Me"))
+                                        .fontWeight(.medium)
+                                }
+                            }
+                            .padding(16)
+                            .onChange(of: item.hasReminder) { _, _ in updateNotifications() }
+                            
+                            if item.hasReminder {
+                                Divider().padding(.leading, 56)
+                                HStack {
+                                    Image(systemName: "clock.arrow.circlepath")
+                                        .foregroundColor(.purple)
+                                        .frame(width: 24)
+                                    Text(LocalizationManager.shared.localized("Reminder Time"))
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                    Spacer()
+                                    Text(LocalizationManager.shared.localized("At time of event"))
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(16)
+                            }
+
+                            Divider().padding(.leading, 56)
+                            
+                            // Location Row
+                            HStack {
+                                Image(systemName: "mappin.and.ellipse")
+                                    .foregroundColor(.red)
+                                    .frame(width: 24)
+                                TextField(LocalizationManager.shared.localized("Add Location"), text: bindingLocation)
                                     .fontWeight(.medium)
                             }
-                            .padding()
-                            .background(Color(.secondarySystemGroupedBackground))
-                            .cornerRadius(12)
-                            .tint(.blue)
-                            .onChange(of: item.hasReminder) { oldValue, newValue in
-                                updateNotifications()
-                            }
+                            .padding(16)
                         }
+                        .background(Color(.secondarySystemGroupedBackground))
+                        .cornerRadius(24)
+                        .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 4)
                         
-                        // Date & Time
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("DUE DATE")
+                        // Category Card
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text(LocalizationManager.shared.localized("CATEGORY"))
                                 .font(.caption)
                                 .fontWeight(.bold)
                                 .foregroundColor(.secondary)
-                            
-                            DatePicker("Select Date", selection: $item.timestamp)
-                                .datePickerStyle(.compact)
-                                .padding()
-                                .background(Color(.secondarySystemGroupedBackground))
-                                .cornerRadius(12)
-                                .onChange(of: item.timestamp) { oldValue, newValue in
-                                    updateNotifications()
-                                }
-                        }
-                        
-                        // Location display
-                        if let loc = item.location, !loc.isEmpty {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("LOCATION")
-                                    .font(.caption)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.secondary)
-                                
-                                HStack {
-                                    Image(systemName: "mappin.and.ellipse")
-                                        .foregroundColor(.red)
-                                    Text(loc)
-                                        .font(.subheadline)
-                                }
-                                .padding()
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(Color(.secondarySystemGroupedBackground))
-                                .cornerRadius(12)
-                            }
-                        }
-                        
-                        // Category selection ... (keeping existing)
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("CATEGORY")
-                                .font(.caption)
-                                .fontWeight(.bold)
-                                .foregroundColor(.secondary)
+                                .padding(.horizontal, 4)
                             
                             ScrollView(.horizontal, showsIndicators: false) {
-                                HStack {
+                                HStack(spacing: 12) {
                                     ForEach(["Inbox", "Work", "Personal", "Admin"], id: \.self) { cat in
-                                        Button(action: { item.category = cat }) {
-                                            Text(cat)
-                                                .font(.subheadline)
-                                                .fontWeight(.medium)
-                                                .padding(.horizontal, 16)
-                                                .padding(.vertical, 8)
-                                .background(item.category == cat ? Color.blue : Color(.secondarySystemGroupedBackground))
-                                                .foregroundColor(item.category == cat ? .white : .primary)
-                                                .cornerRadius(20)
-                                                .overlay(
-                                                    RoundedRectangle(cornerRadius: 20)
-                                                        .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                                                )
+                                        Button(action: { 
+                                            withAnimation(.spring(response: 0.3)) {
+                                                item.category = cat
+                                            }
+                                            HapticManager.shared.selection()
+                                        }) {
+                                            HStack(spacing: 6) {
+                                                if item.category == cat {
+                                                    Image(systemName: "checkmark")
+                                                        .font(.caption)
+                                                }
+                                                Text(cat)
+                                                    .fontWeight(.semibold)
+                                            }
+                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, 10)
+                                            .background(item.category == cat ? accentColor : Color(.tertiarySystemGroupedBackground))
+                                            .foregroundColor(item.category == cat ? .white : .primary)
+                                            .cornerRadius(12)
                                         }
+                                        .buttonStyle(PlainButtonStyle())
                                     }
                                 }
-                                .padding(.vertical, 4)
                             }
                         }
+                        .padding(20)
+                        .background(Color(.secondarySystemGroupedBackground))
+                        .cornerRadius(24)
+                        .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 4)
                         
-                        // Attachments display
-                        if item.imageData != nil || item.fileData != nil {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("ATTACHMENTS")
+                        // Attachments & Notes
+                        VStack(alignment: .leading, spacing: 20) {
+                            // Attachments
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text(LocalizationManager.shared.localized("ATTACHMENTS"))
                                     .font(.caption)
                                     .fontWeight(.bold)
                                     .foregroundColor(.secondary)
                                 
-                                HStack(spacing: 12) {
-                                    if let data = item.imageData, let uiImage = UIImage(data: data) {
-                                        Image(uiImage: uiImage)
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fill)
-                                            .frame(width: 60, height: 60)
-                                            .cornerRadius(8)
-                                    }
-                                    
-                                    if let name = item.fileName {
+                                if item.imageData == nil && item.fileData == nil {
+                                    Button(action: {
+                                        // TODO: Implement attachment picker
+                                        HapticManager.shared.notification(type: .warning)
+                                    }) {
                                         HStack {
-                                            Image(systemName: "doc.fill")
-                                            Text(name)
-                                                .font(.caption)
-                                                .lineLimit(1)
+                                            Image(systemName: "plus")
+                                            Text(LocalizationManager.shared.localized("Add Attachment"))
                                         }
-                                        .padding(8)
+                                        .font(.subheadline)
+                                        .foregroundColor(.blue)
+                                        .padding()
+                                        .frame(maxWidth: .infinity)
                                         .background(Color.blue.opacity(0.1))
-                                        .cornerRadius(8)
+                                        .cornerRadius(12)
+                                        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.blue.opacity(0.3), style: StrokeStyle(lineWidth: 1, dash: [5])))
+                                    }
+                                } else {
+                                    HStack(spacing: 12) {
+                                        if let data = item.imageData, let uiImage = UIImage(data: data) {
+                                            Image(uiImage: uiImage)
+                                                .resizable()
+                                                .aspectRatio(contentMode: .fill)
+                                                .frame(width: 80, height: 80)
+                                                .cornerRadius(12)
+                                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.1), lineWidth: 1))
+                                        }
+                                        
+                                        if let name = item.fileName {
+                                            HStack {
+                                                Image(systemName: "doc.fill")
+                                                    .foregroundColor(.blue)
+                                                Text(name)
+                                                    .lineLimit(1)
+                                            }
+                                            .padding()
+                                            .background(Color(.tertiarySystemGroupedBackground))
+                                            .cornerRadius(12)
+                                        }
                                     }
                                 }
                             }
-                        }
-                        
-                        // Notes
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("NOTES")
-                                .font(.caption)
-                                .fontWeight(.bold)
-                                .foregroundColor(.secondary)
                             
-                            TextEditor(text: $item.notes)
-                                .frame(height: 120)
-                                .padding()
-                                .background(Color(.secondarySystemGroupedBackground))
-                                .cornerRadius(12)
+                            Divider()
+                            
+                            // Notes
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text(LocalizationManager.shared.localized("NOTES"))
+                                    .font(.caption)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.secondary)
+                                
+                                ZStack(alignment: .topLeading) {
+                                    if item.notes.isEmpty {
+                                        Text(LocalizationManager.shared.localized("Add notes here..."))
+                                            .foregroundColor(.secondary)
+                                            .padding(.top, 8)
+                                            .padding(.leading, 5)
+                                    }
+                                    TextEditor(text: $item.notes)
+                                        .frame(minHeight: 100)
+                                        .scrollContentBackground(.hidden)
+                                        .background(Color.clear)
+                                }
+                            }
                         }
+                        .padding(20)
+                        .background(Color(.secondarySystemGroupedBackground))
+                        .cornerRadius(24)
+                        .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 4)
+                        
+                        // Delete Button (Standardized)
+                        Button(role: .destructive, action: deleteItem) {
+                            HStack {
+                                Image(systemName: "trash")
+                                Text(LocalizationManager.shared.localized("Delete Task"))
+                            }
+                            .font(.headline)
+                            .foregroundColor(.red)
+                            .padding()
+                            .frame(maxWidth: .infinity)
+                            .background(Color.red.opacity(0.1))
+                            .cornerRadius(16)
+                        }
+                        .padding(.top, 20)
                     }
-                    .padding()
+                    .padding(20)
+                    .padding(.bottom, 40)
                 }
                 .scrollDismissesKeyboard(.interactively)
             }
@@ -297,6 +401,7 @@ struct TaskDetailView: View {
     }
 }
 
+// Helpers for Preview
 #Preview {
     do {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
@@ -306,5 +411,23 @@ struct TaskDetailView: View {
             .modelContainer(container)
     } catch {
        return Text("Failed to create preview: \(error.localizedDescription)")
+    }
+}
+
+extension TaskDetailView {
+    private func priorityColor(_ priority: String) -> Color {
+        switch priority {
+        case "High": return .red
+        case "Medium": return .orange
+        case "Low": return .green
+        default: return .gray
+        }
+    }
+    
+    private var bindingLocation: Binding<String> {
+        Binding(
+            get: { item.location ?? "" },
+            set: { item.location = $0 }
+        )
     }
 }

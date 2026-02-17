@@ -35,8 +35,13 @@ struct ToWorksApp: App {
         
         // Request Notification Permissions on Launch
         NotificationManager.shared.requestAuthorization()
+        
+        // Give NotificationManager access to SwiftData so it can auto-save history
+        NotificationManager.shared.modelContainer = sharedModelContainer
     }
 
+    @StateObject private var localizationManager = LocalizationManager.shared
+    
     var body: some Scene {
         WindowGroup {
             ZStack {
@@ -57,6 +62,7 @@ struct ToWorksApp: App {
             }
             .animation(.spring, value: notificationManager.activeAlarmID)
             .animation(.default, value: hasOnboarded)
+            .environmentObject(localizationManager) // Inject Global Localization
         }
         .modelContainer(sharedModelContainer)
     }

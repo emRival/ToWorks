@@ -7,11 +7,13 @@
 
 import SwiftUI
 import SwiftData
+import Charts
 
 struct StatsView: View {
     @Query(sort: \TodoItem.timestamp, order: .forward) private var allItems: [TodoItem]
     @State private var selectedPeriod = "Week"
     @State private var animateCharts = false
+    @EnvironmentObject var localizationManager: LocalizationManager
     
     private let periods = ["Week", "Month", "All"]
     
@@ -45,381 +47,168 @@ struct StatsView: View {
         return Double(completedItems.count) / Double(filteredItems.count)
     }
     
-    // Tasks per category
-    private var categoryBreakdown: [(String, Int, Color)] {
-        let categories = Dictionary(grouping: filteredItems, by: { $0.category })
-        return categories.map { ($0.key, $0.value.count, categoryColor(for: $0.key)) }
-            .sorted { $0.1 > $1.1 }
-    }
-    
-    // Tasks per priority
-    private var priorityBreakdown: [(String, Int, Color)] {
-        let groups = Dictionary(grouping: filteredItems, by: { $0.priority })
-        let order = ["High", "Medium", "Low"]
-        return order.compactMap { p in
-            guard let count = groups[p]?.count else { return nil }
-            return (p, count, priorityColor(for: p))
-        }
-    }
-    
-    // Weekly activity data (tasks created per day for last 7 days)
-    private var weeklyData: [(String, Int, Bool)] {
-        let cal = Calendar.current
-        let today = cal.startOfDay(for: Date())
-        let dayLabels = ["S", "M", "T", "W", "T", "F", "S"]
-        
-        return (0..<7).reversed().map { offset in
-            let date = cal.date(byAdding: .day, value: -offset, to: today)!
-            let count = allItems.filter { cal.isDate($0.timestamp, inSameDayAs: date) }.count
-            let weekday = cal.component(.weekday, from: date)
-            let isToday = offset == 0
-            return (dayLabels[weekday - 1], count, isToday)
-        }
-    }
-    
-    // Streak: consecutive days with at least 1 completed task
-    private var currentStreak: Int {
-        let cal = Calendar.current
-        var streak = 0
-        let today = cal.startOfDay(for: Date())
-        
-        for offset in 0..<365 {
-            let date = cal.date(byAdding: .day, value: -offset, to: today)!
-            let hasCompleted = allItems.contains { $0.isCompleted && cal.isDate($0.timestamp, inSameDayAs: date) }
-            if hasCompleted {
-                streak += 1
-            } else if offset > 0 {
-                break
-            }
-        }
-        return streak
-    }
-    
-    // Overdue
     private var overdueCount: Int {
         allItems.filter { !$0.isCompleted && $0.timestamp < Date() }.count
     }
     
+    // Weekly activity data for BarChart
+    private var weeklyData: [DailyData] {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        let dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] // Weekday index 1-7 (Sun-Sat)
+        
+        return (0..<7).reversed().map { offset in
+            let date = cal.date(byAdding: .day, value: -offset, to: today)!
+            let count = allItems.filter { cal.isDate($0.timestamp, inSameDayAs: date) }.count
+            let weekdayIndex = cal.component(.weekday, from: date) // 1-7
+            let label = dayLabels[weekdayIndex - 1]
+            return DailyData(day: label, value: count)
+        }
+    }
+    @AppStorage("accentColorChoice") private var accentColorChoice = "Blue"
+    
+    private var accentColor: Color {
+        switch accentColorChoice {
+        case "Blue": return .blue
+        case "Purple": return .purple
+        case "Orange": return .orange
+        case "Green": return .green
+        case "Red": return .red
+        case "Pink": return .pink
+        default: return .blue
+        }
+    }
+    
     var body: some View {
-        ZStack {
-            Color(.systemGroupedBackground).ignoresSafeArea()
-            
-            VStack(spacing: 0) {
-                // Header
-                HStack {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("PERFORMANCE")
-                            .font(.system(size: 11, weight: .heavy))
-                            .foregroundColor(.accentColor.opacity(0.85))
-                            .kerning(1.1)
-                        Text("Productivity Insights")
-                            .font(.system(size: 26, weight: .black, design: .rounded))
-                            .foregroundColor(.primary)
-                    }
-                    
-                    Spacer()
-                    
-                    // Period Picker
-                    Picker("Period", selection: $selectedPeriod) {
-                        ForEach(periods, id: \.self) { p in
-                            Text(p).tag(p)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(width: 180)
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 16)
-                .padding(.bottom, 16)
+        NavigationStack {
+            ZStack {
+                Color(.systemGroupedBackground).ignoresSafeArea()
                 
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 16) {
-                        
-                        // MARK: - Top Row: Completion + Streak
-                        HStack(spacing: 12) {
-                            // Completion Ring
-                            VStack(spacing: 10) {
-                                ZStack {
-                                    Circle()
-                                        .stroke(Color.gray.opacity(0.12), lineWidth: 10)
-                                    Circle()
-                                        .trim(from: 0, to: animateCharts ? completionRate : 0)
-                                        .stroke(
-                                            completionRate >= 0.7 ? Color.green :
-                                            completionRate >= 0.4 ? Color.orange : Color.red,
-                                            style: StrokeStyle(lineWidth: 10, lineCap: .round)
-                                        )
-                                        .rotationEffect(.degrees(-90))
-                                        .animation(.easeOut(duration: 1.0), value: animateCharts)
-                                    
-                                    VStack(spacing: 2) {
-                                        Text("\(Int(completionRate * 100))%")
-                                            .font(.system(size: 22, weight: .black, design: .rounded))
-                                        Text("\(completedItems.count)/\(filteredItems.count)")
-                                            .font(.system(size: 10, weight: .bold))
-                                            .foregroundColor(.secondary)
-                                    }
-                                }
-                                .frame(width: 90, height: 90)
-                                
-                                Text("COMPLETION")
-                                    .font(.system(size: 9, weight: .heavy))
-                                    .kerning(0.8)
-                                    .foregroundColor(.secondary)
-                            }
-                            .padding(16)
-                            .frame(maxWidth: .infinity)
-                            .background(Color(.secondarySystemGroupedBackground))
-                            .cornerRadius(20)
-                            .shadow(color: .black.opacity(0.04), radius: 12, y: 6)
-                            
-                            // Stats Stack
-                            VStack(spacing: 10) {
-                                statMiniCard(
-                                    icon: "flame.fill",
-                                    color: .orange,
-                                    value: "\(currentStreak)",
-                                    label: "DAY STREAK"
-                                )
-                                
-                                statMiniCard(
-                                    icon: "exclamationmark.triangle.fill",
-                                    color: .red,
-                                    value: "\(overdueCount)",
-                                    label: "OVERDUE"
-                                )
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-                        
-                        // MARK: - Quick Numbers
-                        HStack(spacing: 12) {
-                            quickStatCard(value: "\(filteredItems.count)", label: "Total", icon: "list.bullet", color: .blue)
-                            quickStatCard(value: "\(completedItems.count)", label: "Done", icon: "checkmark.circle.fill", color: .green)
-                            quickStatCard(value: "\(pendingItems.count)", label: "Pending", icon: "clock.fill", color: .orange)
-                        }
-                        
-                        // MARK: - Weekly Activity
-                        VStack(alignment: .leading, spacing: 14) {
-                            Text("WEEKLY ACTIVITY")
+                VStack(spacing: 0) {
+                    // Header
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(LocalizationManager.shared.localized("PERFORMANCE"))
                                 .font(.system(size: 11, weight: .heavy))
-                                .kerning(0.8)
-                                .foregroundColor(.secondary)
-                            
-                            HStack(alignment: .bottom, spacing: 8) {
-                                ForEach(Array(weeklyData.enumerated()), id: \.offset) { index, data in
-                                    let (label, count, isToday) = data
-                                    let maxCount = max(weeklyData.map { $0.1 }.max() ?? 1, 1)
-                                    let height = max(CGFloat(count) / CGFloat(maxCount) * 80, 6)
-                                    
-                                    VStack(spacing: 6) {
-                                        Text("\(count)")
-                                            .font(.system(size: 9, weight: .bold))
-                                            .foregroundColor(.secondary)
-                                        
-                                        RoundedRectangle(cornerRadius: 6)
-                                            .fill(
-                                                isToday
-                                                ? LinearGradient(colors: [.blue, .indigo], startPoint: .bottom, endPoint: .top)
-                                                : LinearGradient(colors: [.gray.opacity(0.2), .gray.opacity(0.15)], startPoint: .bottom, endPoint: .top)
-                                            )
-                                            .frame(height: animateCharts ? height : 6)
-                                            .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(Double(index) * 0.05), value: animateCharts)
-                                        
-                                        Text(label)
-                                            .font(.system(size: 10, weight: .heavy))
-                                            .foregroundColor(isToday ? .blue : .secondary)
-                                    }
-                                    .frame(maxWidth: .infinity)
-                                }
-                            }
-                            .frame(height: 120)
-                        }
-                        .padding(20)
-                        .background(Color(.secondarySystemGroupedBackground))
-                        .cornerRadius(20)
-                        .shadow(color: .black.opacity(0.04), radius: 12, y: 6)
-                        
-                        // MARK: - Category Breakdown
-                        if !categoryBreakdown.isEmpty {
-                            VStack(alignment: .leading, spacing: 14) {
-                                Text("BY CATEGORY")
-                                    .font(.system(size: 11, weight: .heavy))
-                                    .kerning(0.8)
-                                    .foregroundColor(.secondary)
-                                
-                                ForEach(categoryBreakdown, id: \.0) { name, count, color in
-                                    HStack(spacing: 12) {
-                                        Circle()
-                                            .fill(color)
-                                            .frame(width: 10, height: 10)
-                                        
-                                        Text(name)
-                                            .font(.system(size: 14, weight: .bold))
-                                        
-                                        Spacer()
-                                        
-                                        // Bar
-                                        GeometryReader { geo in
-                                            let maxCount = categoryBreakdown.first?.1 ?? 1
-                                            let width = max(CGFloat(count) / CGFloat(maxCount) * geo.size.width, 20)
-                                            
-                                            RoundedRectangle(cornerRadius: 4)
-                                                .fill(color.opacity(0.2))
-                                                .overlay(
-                                                    RoundedRectangle(cornerRadius: 4)
-                                                        .fill(color)
-                                                        .frame(width: animateCharts ? width : 0),
-                                                    alignment: .leading
-                                                )
-                                                .animation(.easeOut(duration: 0.8), value: animateCharts)
-                                        }
-                                        .frame(width: 100, height: 8)
-                                        
-                                        Text("\(count)")
-                                            .font(.system(size: 14, weight: .black, design: .rounded))
-                                            .foregroundColor(.primary)
-                                            .frame(width: 28, alignment: .trailing)
-                                    }
-                                }
-                            }
-                            .padding(20)
-                            .background(Color(.secondarySystemGroupedBackground))
-                            .cornerRadius(20)
-                            .shadow(color: .black.opacity(0.04), radius: 12, y: 6)
+                                .foregroundColor(accentColor.opacity(0.8))
+                                .kerning(1.1)
+                            Text(LocalizationManager.shared.localized("Insights"))
+                                .font(.system(size: 32, weight: .bold))
+                                .foregroundColor(.primary)
                         }
                         
-                        // MARK: - Priority Breakdown
-                        if !priorityBreakdown.isEmpty {
-                            VStack(alignment: .leading, spacing: 14) {
-                                Text("BY PRIORITY")
-                                    .font(.system(size: 11, weight: .heavy))
-                                    .kerning(0.8)
-                                    .foregroundColor(.secondary)
-                                
-                                HStack(spacing: 12) {
-                                    ForEach(priorityBreakdown, id: \.0) { name, count, color in
-                                        VStack(spacing: 8) {
-                                            ZStack {
-                                                Circle()
-                                                    .stroke(color.opacity(0.2), lineWidth: 6)
-                                                    .frame(width: 50, height: 50)
-                                                Circle()
-                                                    .trim(from: 0, to: animateCharts ? (filteredItems.isEmpty ? 0 : CGFloat(count) / CGFloat(filteredItems.count)) : 0)
-                                                    .stroke(color, style: StrokeStyle(lineWidth: 6, lineCap: .round))
-                                                    .frame(width: 50, height: 50)
-                                                    .rotationEffect(.degrees(-90))
-                                                    .animation(.easeOut(duration: 0.8), value: animateCharts)
-                                                
-                                                Text("\(count)")
-                                                    .font(.system(size: 16, weight: .black, design: .rounded))
-                                            }
-                                            
-                                            HStack(spacing: 4) {
-                                                Image(systemName: "flag.fill")
-                                                    .font(.system(size: 8))
-                                                Text(name)
-                                                    .font(.system(size: 10, weight: .heavy))
-                                            }
-                                            .foregroundColor(color)
-                                        }
-                                        .frame(maxWidth: .infinity)
-                                    }
-                                }
+                        Spacer()
+                        
+                        Picker("Period", selection: $selectedPeriod) {
+                            ForEach(periods, id: \.self) { p in
+                                Text(LocalizationManager.shared.localized(p)).tag(p)
                             }
-                            .padding(20)
-                            .background(Color(.secondarySystemGroupedBackground))
-                            .cornerRadius(20)
-                            .shadow(color: .black.opacity(0.04), radius: 12, y: 6)
                         }
+                        .pickerStyle(.segmented)
+                        .frame(width: 180)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 120)
+                    .padding(.horizontal, 24)
+                    .padding(.top, 16)
+                    .padding(.bottom, 16)
+                    .background(Material.ultraThinMaterial)
+                    .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+                    .padding(.bottom, 8)
+                    
+                    ScrollView(.vertical, showsIndicators: false) {
+                        VStack(spacing: 16) {
+                            
+                            // 1. Completion Rate (Full Width)
+                            // 1. Completion Rate (Full Width)
+                            HStack(spacing: 20) {
+                                CircularProgressView(progress: animateCharts ? completionRate : 0, color: accentColor)
+                                
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text(localizationManager.localized("Great Job!"))
+                                        .font(.title3)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.primary)
+                                        .layoutPriority(1)
+                                    
+                                    let periodLower = localizationManager.localized(selectedPeriod.lowercased())
+                                    Text(String(format: localizationManager.localized("You have completed %d%% of your tasks this %@."), Int(completionRate * 100), periodLower))
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                        .lineLimit(3)
+                                        .minimumScaleFactor(0.5) // Allow text to shrink if needed
+                                }
+                                Spacer(minLength: 0)
+                            } // HStack
+                            .padding(20)
+                            .background(Color.cardBackground)
+                            .cornerRadius(24)
+                            .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 4)
+                            
+                            // 2. Metrics Grid
+                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                                StatGenericCard(
+                                    title: LocalizationManager.shared.localized("Total Done"),
+                                    value: "\(completedItems.count)",
+                                    icon: "checkmark.circle.fill",
+                                    color: accentColor // Apply Accent
+                                )
+                                
+                                StatGenericCard(
+                                    title: LocalizationManager.shared.localized("Pending"),
+                                    value: "\(pendingItems.count)",
+                                    icon: "clock.fill",
+                                    color: .orange // Pending often keeps orange/red semantic, but could use accent secondary? keeping orange for semantic distinction
+                                )
+                            }
+                            
+                            // 3. Weekly Activity Chart (Full Width)
+                            BarChartView(data: weeklyData, color: accentColor)
+                            
+                            // 4. Overdue (Full Width)
+                            if overdueCount > 0 {
+                                HStack {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .font(.system(size: 24))
+                                        .foregroundColor(.red)
+                                        .padding(12)
+                                        .background(Color.red.opacity(0.1))
+                                        .clipShape(Circle())
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(LocalizationManager.shared.localized("Attention Needed"))
+                                            .font(.headline)
+                                        Text(String(format: LocalizationManager.shared.localized("You have %d overdue tasks."), overdueCount))
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    Spacer()
+                                    
+                                    Image(systemName: "chevron.right")
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(20)
+                                .background(Color.cardBackground)
+                                .cornerRadius(24)
+                                .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 4)
+                            }
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 120)
+                        .frame(maxWidth: .infinity)
+                    }
                 }
             }
-        }
-        .navigationBarHidden(true)
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                animateCharts = true
+            .onAppear {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    animateCharts = true
+                }
             }
-        }
-        .onChange(of: selectedPeriod) { _, _ in
-            animateCharts = false
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                animateCharts = true
+            .onChange(of: selectedPeriod) { _, _ in
+                animateCharts = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    animateCharts = true
+                }
             }
-        }
-    }
-    
-    // MARK: - Mini Components
-    
-    private func statMiniCard(icon: String, color: Color, value: String, label: String) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 16, weight: .bold))
-                .foregroundColor(color)
-                .frame(width: 36, height: 36)
-                .background(color.opacity(0.12))
-                .cornerRadius(10)
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text(value)
-                    .font(.system(size: 20, weight: .black, design: .rounded))
-                Text(label)
-                    .font(.system(size: 8, weight: .heavy))
-                    .kerning(0.5)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-        }
-        .padding(14)
-        .background(Color(.secondarySystemGroupedBackground))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.04), radius: 10, y: 4)
-    }
-    
-    private func quickStatCard(value: String, label: String, icon: String, color: Color) -> some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.system(size: 18))
-                .foregroundColor(color)
-            
-            Text(value)
-                .font(.system(size: 22, weight: .black, design: .rounded))
-            
-            Text(label)
-                .font(.system(size: 10, weight: .heavy))
-                .foregroundColor(.secondary)
-                .kerning(0.5)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
-        .background(Color(.secondarySystemGroupedBackground))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.04), radius: 10, y: 4)
-    }
-    
-    // MARK: - Helpers
-    
-    private func categoryColor(for category: String) -> Color {
-        switch category {
-        case "Work": return .blue
-        case "Personal": return .orange
-        case "Admin": return .purple
-        case "Health": return .green
-        case "Study": return .cyan
-        default: return .gray
-        }
-    }
-    
-    private func priorityColor(for priority: String) -> Color {
-        switch priority {
-        case "High": return .red
-        case "Medium": return .orange
-        case "Low": return .green
-        default: return .gray
         }
     }
 }

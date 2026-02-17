@@ -8,6 +8,7 @@
 import UserNotifications
 import Combine
 import AudioToolbox
+import SwiftData
 
 class NotificationManager: NSObject, ObservableObject {
     static let shared = NotificationManager()
@@ -15,6 +16,9 @@ class NotificationManager: NSObject, ObservableObject {
     @Published var settings: UNNotificationSettings?
     @Published var isAuthorized = false
     @Published var activeAlarmID: String? = nil
+    
+    /// Set this from ToWorksApp so that NotificationManager can auto-save history records.
+    var modelContainer: ModelContainer?
     
     override init() {
         super.init()
@@ -175,8 +179,29 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
+        // Auto-save to notification history
+        saveNotificationRecord(
+            title: notification.request.content.title,
+            body: notification.request.content.body
+        )
+        
         // Show banner + sound + badge even while app is open
         completionHandler([.banner, .sound, .badge, .list])
+    }
+    
+    /// Save a NotificationRecord into SwiftData so it appears in the history list.
+    private func saveNotificationRecord(title: String, body: String) {
+        guard let container = modelContainer else {
+            print("⚠️ No modelContainer set on NotificationManager — cannot save notification record.")
+            return
+        }
+        Task { @MainActor in
+            let context = container.mainContext
+            let record = NotificationRecord(title: title, body: body, timestamp: Date())
+            context.insert(record)
+            try? context.save()
+            print("📝 Saved notification record: \(title)")
+        }
     }
     
     // Handle notification tap & actions

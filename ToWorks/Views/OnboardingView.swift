@@ -20,7 +20,7 @@ struct OnboardingView: View {
     var body: some View {
         ZStack {
             // Consistent App Background
-            Color(hex: "F8F9FE").ignoresSafeArea()
+            Color(.systemGroupedBackground).ignoresSafeArea()
             
             VStack {
                 Spacer()
@@ -37,11 +37,11 @@ struct OnboardingView: View {
                 
                 // Welcome Text
                 VStack(spacing: 8) {
-                    Text("Welcome to ToWorks")
+                    Text(LocalizationManager.shared.localized("Welcome to ToWorks"))
                         .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .foregroundColor(.black)
+                        .foregroundColor(.primary)
                     
-                    Text("Let's get productive. First, what should we call you?")
+                    Text(LocalizationManager.shared.localized("Let's get productive. First, what should we call you?"))
                         .font(.system(size: 16, weight: .regular))
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
@@ -51,15 +51,15 @@ struct OnboardingView: View {
                 
                 // Input Section (Card Style)
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("YOUR NAME")
+                    Text(LocalizationManager.shared.localized("YOUR NAME"))
                         .font(.system(size: 11, weight: .black))
                         .foregroundColor(.secondary)
                         .tracking(1)
                     
-                    TextField("Enter your first name", text: $inputName)
+                    TextField(LocalizationManager.shared.localized("Enter your first name"), text: $inputName)
                         .font(.system(size: 20, weight: .semibold, design: .rounded))
                         .padding(20)
-                        .background(Color.white)
+                        .background(Color(.secondarySystemGroupedBackground))
                         .cornerRadius(16)
                         .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
                         .submitLabel(.done)
@@ -84,7 +84,7 @@ struct OnboardingView: View {
                 // Floating Action Button Style
                 Button(action: submit) {
                     HStack {
-                        Text("Get Started")
+                        Text(LocalizationManager.shared.localized("Get Started"))
                             .font(.system(size: 18, weight: .bold))
                         Image(systemName: "arrow.right")
                             .font(.system(size: 18, weight: .bold))
