@@ -614,6 +614,10 @@ struct VoiceCommandView: View {
             #"(?i)(\d{1,2})(?:\s*[.:]\s*(\d{2}))?\s*(am|pm|h|heures|uhr|horas|baje|โมง|giờ|시|点|點|時)"#,
             // CJK Clean patterns (Simplified to avoid complexity issues)
             #"\s*明日"#, #"\s*明天"#, #"\s*明後日"#, #"\s*后天"#, #"\s*来週"#, #"\s*下周"#,
+            // Explicit Date Removal
+            #"(?i)\btanggal\s+\d{1,2}\b"#, #"(?i)\btgl\s+\d{1,2}\b"#,
+            #"(?i)\bon\s+the\s+\d{1,2}(?:st|nd|rd|th)?\b"#, #"(?i)\d{1,2}(?:st|nd|rd|th)\b"#,
+            #"\d{1,2}\s*日"#, #"\d{1,2}\s*일"#,
             // Match time pattern with optional prefix/suffix but simplified groups
             #"(?:午前|午後|朝|夜|深夜|夕方|上午|下午|早上|晚上|中午|凌晨|오전|오후|아침|저녁|밤|새벽)?\s*\d{1,2}\s*(?:時|点|點|시)(?:\s*\d{1,2}\s*(?:分|분))?(?:에|に|へ|から|まで|부터)?"#
         ]
@@ -676,7 +680,7 @@ struct VoiceCommandView: View {
         
         // 2. Normalize Time Separators: Replace . , 。 ． ： with :
         // This fixes "11.15" -> "11:15" ensuring generic regex catches it
-        let separators = [".", ",", "。", "．", "：", " "]
+        _ = [".", ",", "。", "．", "：", " "]
         // Only replace if surrounded by digits to avoid breaking text
         // Actually, safer to just replace specific time-like patterns using regex
         // Pattern: (\d{1,2})[.,。．：](\d{2}) -> $1:$2
@@ -845,17 +849,29 @@ struct VoiceCommandView: View {
                                 
                                 // Logic: If today is 25th and user says "30th", it's this month.
                                 // If today is 30th and user says "5th", it's next month.
-                                // If today is 30th and user says "30th", it's today (or next month if strictly future? Let's assume today for now, time parsing will adjust if time passed).
                                 
                                 if day < currentDay {
-                                    // Next month
+                                    // Strictly next month
                                     if let month = comps.month {
                                         comps.month = month + 1
                                     }
                                 }
                                 
-                                if let date = cal.date(from: comps) {
-                                    return date
+                                // LOOP: Find next valid month for this day
+                                // e.g. If today is Feb 17, user says "30". Feb 30 invalid.
+                                // Code defaults to March 2. We want March 30 (or April 30 if March didn't have 30).
+                                var attempts = 0
+                                while attempts < 12 {
+                                    if let candidate = cal.date(from: comps) {
+                                        let candidateDay = cal.component(.day, from: candidate)
+                                        if candidateDay == day {
+                                            return candidate
+                                        }
+                                    }
+                                    // If we are here, the date wrapped (e.g. Feb 30 -> Mar 2)
+                                    // Move to next month and try again
+                                    if let m = comps.month { comps.month = m + 1 }
+                                    attempts += 1
                                 }
                             }
                         }
