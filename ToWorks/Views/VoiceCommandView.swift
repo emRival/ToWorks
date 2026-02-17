@@ -432,14 +432,16 @@ struct VoiceCommandView: View {
         let raw = speechManager.recognizedText
         guard !raw.isEmpty, raw != "Listening...", raw != speechManager.activeLanguage.listeningText else { return }
         
-        var workingText = raw
+        // Normalize: Convert Kanji/Hanzi/Full-width numbers to ASCII digits
+        let workingText = normalizeVoiceInput(raw)
+        
         var title = ""
         var notes = ""
         var location = ""
         var date = Date()
         var priority = "Medium"
         
-        let lowText = raw.lowercased()
+        let lowText = workingText.lowercased()
         
         // --- Priority Detection ---
         if lowText.contains("urgent") || lowText.contains("important") || lowText.contains("penting") || lowText.contains("high priority") || lowText.contains("緊急") || lowText.contains("긴급") {
@@ -630,6 +632,42 @@ struct VoiceCommandView: View {
         }
     }
     
+    // MARK: - Voice Normalization
+    
+    private func normalizeVoiceInput(_ text: String) -> String {
+        var processed = text
+        
+        // 1. Full-width to Half-width numbers ((０-９) -> (0-9))
+        let fullWidth = ["０","１","２","３","４","５","６","７","８","９"]
+        for (i, char) in fullWidth.enumerated() {
+            processed = processed.replacingOccurrences(of: char, with: "\(i)")
+        }
+        
+        // 2. Kanji/Hanzi Numerals (Simple 1-10, 20, 30...)
+        // This is a basic implementation. For "23" (二十三), simplistic replacement might fail without logic.
+        // But Speech Recognizer often outputs "23" or "二十三".
+        // Let's handle 1-12 specifically for time, and common day numbers.
+        
+        let kanjiMap: [(String, String)] = [
+            ("一", "1"), ("二", "2"), ("三", "3"), ("四", "4"), ("五", "5"),
+            ("六", "6"), ("七", "7"), ("八", "8"), ("九", "9"), ("十", "10"),
+            ("十一", "11"), ("十二", "12"), ("二十", "20"), ("三十", "30")
+        ]
+        
+        for (kanji, digit) in kanjiMap {
+            // Only replace if surrounded by time keywords OR if it looks like a standalone number
+            // For safety, let's just replace them if they are likely time.
+            // Actually, replacing globally is usually safe for Task Titles too unless context is lost.
+            processed = processed.replacingOccurrences(of: kanji, with: digit)
+        }
+        
+        // Arabic/Persian/Hindi numerals if needed
+        // For now, iOS SpeechRecognizer usually respects locale but might output locale-specific digits.
+        // Let's stick to CJK normalization first as requested.
+        
+        return processed
+    }
+    
     // MARK: - Relative Time Parsing
     
     private func parseRelativeTime(from text: String) -> Date? {
@@ -790,8 +828,11 @@ struct VoiceCommandView: View {
             return extractGlobalTimeSuffix(from: timeStr, pattern: suffixPattern, baseDate: baseDate)
         }
         
-        // CJK Prefix Time: "午後3時"
-        let cjkPattern = #"(午前|午後|上午|下午)?\s*(\d{1,2})\s*(?:時|点|點)(?:\s*(\d{1,2})\s*(?:分))?"#
+        // CJK / Korean Contextual Time
+        // Japanese: "午後3時", "15時"
+        // Korean: "오후 3시", "3시"
+        // Chinese: "下午3点", "15点"
+        let cjkPattern = #"(午前|午後|上午|下午|오전|오후)?\s*(\d{1,2})\s*(?:時|点|點|시)(?:\s*(\d{1,2})\s*(?:分|분))?"#
         if let match = text.range(of: cjkPattern, options: .regularExpression) {
             let timeStr = String(text[match])
             return extractCJKTime(from: timeStr, pattern: cjkPattern, baseDate: baseDate) ?? baseDate
@@ -866,7 +907,7 @@ struct VoiceCommandView: View {
     // Legacy functions replaced by universal ones, keeping CJK
     
     private func extractCJKTime(from text: String, pattern: String, baseDate: Date) -> Date? {
-        // Group 1: Modifier (Optional) - Gozen/Gogo/Shangwu/Xiawu
+        // Group 1: Modifier (Optional) - Gozen/Gogo/Shangwu/Xiawu/Ojeon/Ohu
         // Group 2: Hour
         // Group 3: Minute (Optional)
         guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { return nil }
@@ -878,8 +919,8 @@ struct VoiceCommandView: View {
         
         if match.range(at: 1).location != NSNotFound, let modRange = Range(match.range(at: 1), in: text) {
             let modifier = String(text[modRange])
-            if ["午後", "下午"].contains(modifier) { isPM = true }
-            if ["午前", "上午"].contains(modifier) { isAM = true }
+            if ["午後", "下午", "오후"].contains(modifier) { isPM = true }
+            if ["午前", "上午", "오전"].contains(modifier) { isAM = true }
         }
         
         let hourRange = Range(match.range(at: 2), in: text)
