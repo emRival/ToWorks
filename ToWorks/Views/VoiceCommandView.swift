@@ -465,14 +465,13 @@ struct VoiceCommandView: View {
         // STEP 3: Extract Location ("di [place]")
         // =============================================
         // Pattern: "di [place]" — capture word(s) after "di" up to a comma, time phrase, or note keyword
+        // Path 1: "di [place]" (Indonesian/Malay)
         let locationPattern = #"\bdi\s+([A-Za-z\u00C0-\u024F]+(?:\s+[A-Za-z\u00C0-\u024F]+)*)"#
         if let regex = try? NSRegularExpression(pattern: locationPattern, options: .caseInsensitive) {
             let nsText = workingText as NSString
             let nsRange = NSRange(location: 0, length: nsText.length)
-            // Find all "di X" matches
             let matches = regex.matches(in: workingText, options: [], range: nsRange)
             
-            // Exclude common words that follow "di" but are NOT locations
             let nonLocationWords = ["dalam", "atas", "bawah", "sini", "situ", "sana", "mana", "antara", "rumah"]
             
             for match in matches {
@@ -481,21 +480,46 @@ struct VoiceCommandView: View {
                     let firstWord = captured.lowercased().split(separator: " ").first.map(String.init) ?? captured.lowercased()
                     
                     if !nonLocationWords.contains(firstWord) && captured.count > 2 {
-                        // Clean up: remove trailing time/note keywords from location
+                        // Clean up trailing keywords
                         var cleanLocation = captured
-                        let stopWords = ["jam", "pukul", "jangan", "catatan", "notes", "besok", "lusa"]
+                        // Add "malam", "siang", "pagi" to stop words to prevent "sekolah malam" from being location unless intended? 
+                        // Actually, "di sekolah malam" -> "sekolah". "di sekolah jam 5" -> "sekolah" matched by stop words below.
+                        let stopWords = ["jam", "pukul", "jangan", "catatan", "notes", "besok", "lusa", "pada", "saat"]
                         for stop in stopWords {
-                            if let stopRange = cleanLocation.lowercased().range(of: stop) {
+                            if let stopRange = cleanLocation.lowercased().range(of: " \(stop)") { // use space to avoid partial match inside word
                                 cleanLocation = String(cleanLocation[cleanLocation.startIndex..<stopRange.lowerBound])
                             }
                         }
                         cleanLocation = cleanLocation.trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
                         
                         if !cleanLocation.isEmpty {
-                            // Capitalize each word for proper location name
                             location = cleanLocation.split(separator: " ").map { $0.prefix(1).uppercased() + $0.dropFirst().lowercased() }.joined(separator: " ")
                         }
                         break
+                    }
+                }
+            }
+        }
+        
+        // Path 2: "[Place]で" (Japan - 'de' implies location of action)
+        // Regex: (Any non-whitespace characters) + で
+        // Avoid capturing numbers (dates/times) before 'de'
+        if location.isEmpty {
+            // Look for pattern: Not-Space-Or-Digit + で (de)
+            // e.g. "学校で" (Gakkou de) -> "学校"
+            let jpLocationPattern = #"([^\s\d\p{P}]+)で"#
+            if let jpRegex = try? NSRegularExpression(pattern: jpLocationPattern, options: []) {
+                let nsText = workingText as NSString
+                let matches = jpRegex.matches(in: workingText, options: [], range: NSRange(location: 0, length: nsText.length))
+                
+                for match in matches {
+                    if let captureRange = Range(match.range(at: 1), in: workingText) {
+                        let captured = String(workingText[captureRange])
+                        // Filter out common non-location particles/words if necessary
+                        if captured.count > 1 { // Avoid single chars if possible
+                             location = captured
+                             break
+                        }
                     }
                 }
             }
@@ -831,7 +855,7 @@ struct VoiceCommandView: View {
         let suffixPattern = #"(?i)(\d{1,2})(?:\s*[.:]\s*(\d{2}))?\s*(am|pm|h|heures|uhr|horas|baje|โมง|giờ|시|点|點|時)"#
         if let match = text.range(of: suffixPattern, options: .regularExpression) {
             let timeStr = String(text[match])
-            return extractGlobalTimeSuffix(from: timeStr, pattern: suffixPattern, baseDate: baseDate)
+            return extractGlobalTimeSuffix(from: timeStr, pattern: suffixPattern, baseDate: baseDate) // Suffix logic works for bare numbers too (0 suffix)
         }
         
         // CJK / Korean Contextual Time
@@ -839,6 +863,15 @@ struct VoiceCommandView: View {
         if let match = text.range(of: cjkPattern, options: .regularExpression) {
             let timeStr = String(text[match])
             return extractCJKTime(from: timeStr, pattern: cjkPattern, baseDate: baseDate) ?? baseDate
+        }
+
+        // Generic Fallback: "11:15", "11.15" (Standalone)
+        // Only if it looks strictly like time (at start of line or space before)
+        // \b(\d{1,2})[.:](\d{2})\b
+        let genericPattern = #"\b(\d{1,2})[.:](\d{2})\b"#
+        if let match = text.range(of: genericPattern, options: .regularExpression) {
+            let timeStr = String(text[match])
+            return extractGlobalTimeSuffix(from: timeStr, pattern: genericPattern, baseDate: baseDate) // Suffix logic works for bare numbers too (0 suffix)
         }
 
         return baseDate
