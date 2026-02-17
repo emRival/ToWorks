@@ -92,3 +92,7 @@ venv/
 process_readme_logo.py
 generate_icons.py
 new_logo.png
+
+# Agent folders
+.agent/
+.agents/
