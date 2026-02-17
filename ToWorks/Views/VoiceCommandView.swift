@@ -863,30 +863,6 @@ struct VoiceCommandView: View {
                 }
             }
         }
-                var comps = cal.dateComponents([.year, .month], from: now)
-                comps.day = day
-                if let result = cal.date(from: comps), result > now {
-                    return result
-                } else {
-                    comps.month = (comps.month ?? 1) + 1
-                    return cal.date(from: comps)
-                }
-            }
-        }
-        // "XX日" (CJK for "Date XX")
-        if let match = text.range(of: #"(\d{1,2})日"#, options: .regularExpression) {
-            let timeStr = String(text[match])
-            if let range = timeStr.range(of: #"\d+"#, options: .regularExpression), let day = Int(timeStr[range]) {
-                var comps = cal.dateComponents([.year, .month], from: now)
-                comps.day = day
-                if let result = cal.date(from: comps), result > now {
-                    return result
-                } else {
-                    comps.month = (comps.month ?? 1) + 1
-                    return cal.date(from: comps)
-                }
-            }
-        }
         
         return nil
     }
