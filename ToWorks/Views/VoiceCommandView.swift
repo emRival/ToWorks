@@ -618,6 +618,9 @@ struct VoiceCommandView: View {
             #"(?i)\btanggal\s+\d{1,2}\b"#, #"(?i)\btgl\s+\d{1,2}\b"#,
             #"(?i)\bon\s+the\s+\d{1,2}(?:st|nd|rd|th)?\b"#, #"(?i)\d{1,2}(?:st|nd|rd|th)\b"#,
             #"\d{1,2}\s*日"#, #"\d{1,2}\s*일"#,
+            // Explicit Day-Month Removal (e.g. "9 Maret", "March 9")
+            #"(?i)\d{1,2}\s+(?:januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\b"#,
+            #"(?i)(?:januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\s+\d{1,2}\b"#,
             // Match time pattern with optional prefix/suffix but simplified groups
             #"(?:午前|午後|朝|夜|深夜|夕方|上午|下午|早上|晚上|中午|凌晨|오전|오후|아침|저녁|밤|새벽)?\s*\d{1,2}\s*(?:時|点|點|시)(?:\s*\d{1,2}\s*(?:分|분))?(?:에|に|へ|から|まで|부터)?"#
         ]
@@ -811,12 +814,85 @@ struct VoiceCommandView: View {
             }
         }
         
+        // 6. Day + Month Parsing (e.g. "9 Maret", "30 Februari", "March 9")
+        // Check this BEFORE explicit day only, to capture the month context.
+        let months = [
+            "januari": 1, "january": 1, "jan": 1,
+            "februari": 2, "february": 2, "feb": 2,
+            "maret": 3, "march": 3, "mar": 3,
+            "april": 4, "apr": 4,
+            "mei": 5, "may": 5,
+            "juni": 6, "june": 6, "jun": 6,
+            "juli": 7, "july": 7, "jul": 7,
+            "agustus": 8, "august": 8, "aug": 8,
+            "september": 9, "sept": 9, "sep": 9,
+            "oktober": 10, "october": 10, "oct": 10,
+            "november": 11, "nov": 11,
+            "desember": 12, "december": 12, "dec": 12
+        ]
+        
+        // Pattern: (\d{1,2}) (MonthName) OR (MonthName) (\d{1,2})
+        let monthNames = months.keys.joined(separator: "|")
+        let dayMonthPattern = #"(?i)\b(\d{1,2})\s+(\#(monthNames))\b|\b(\#(monthNames))\s+(\d{1,2})\b"#
+        
+        if let regex = try? NSRegularExpression(pattern: dayMonthPattern, options: .caseInsensitive) {
+            let matches = regex.matches(in: text, options: [], range: NSRange(location: 0, length: text.utf16.count))
+            for match in matches {
+                var day: Int?
+                var month: Int?
+                
+                // Group 1 (Day) + Group 2 (Month)
+                if match.range(at: 1).location != NSNotFound, match.range(at: 2).location != NSNotFound {
+                    day = Int((text as NSString).substring(with: match.range(at: 1)))
+                    let mStr = (text as NSString).substring(with: match.range(at: 2)).lowercased()
+                    month = months[mStr]
+                }
+                // Group 3 (Month) + Group 4 (Day)
+                else if match.range(at: 3).location != NSNotFound, match.range(at: 4).location != NSNotFound {
+                    let mStr = (text as NSString).substring(with: match.range(at: 3)).lowercased()
+                    month = months[mStr]
+                    day = Int((text as NSString).substring(with: match.range(at: 4)))
+                }
+                
+                if let d = day, let m = month {
+                    var comps = cal.dateComponents([.year, .month, .day], from: now)
+                    comps.month = m
+                    
+                    // Handle Year Rollover (e.g. today is Dec, user says Jan)
+                    // If month < current month, assume next year? Or stay in current year?
+                    // User preference: usually next occurrence.
+                    // But for "9 Maret" (if today is Feb 17), it's this year.
+                    // If today is "June", user says "January", likely next year.
+                    let currentMonth = cal.component(.month, from: now)
+                    if m < currentMonth {
+                       // comps.year = (comps.year ?? 2024) + 1  // Disable for now, keep current year unless explicitly requested?
+                       // Let's stick to current year for "Birthday" etc unless it passed?
+                       // Actually, if date passed, +1 year is better UX.
+                       // let testDate = cal.date(from: comps)
+                       // if testDate < now { comps.year += 1 } 
+                       // Keep it simple first.
+                    }
+                    
+                    // CLAMPING LOGIC (The Fix for '30 Februari')
+                    // 1. Set to 1st of target month
+                    comps.day = 1
+                    if let monthStart = cal.date(from: comps),
+                       let range = cal.range(of: .day, in: .month, for: monthStart) {
+                        let maxDay = range.count
+                        comps.day = min(d, maxDay) // Clamp 30 -> 28/29
+                    } else {
+                        comps.day = d
+                    }
+                    
+                    if let date = cal.date(from: comps) {
+                        return date
+                    }
+                }
+            }
+        }
+
         // 5. Explicit Day Parsing (e.g. "tanggal 30", "30th", "30日")
-        // Patterns:
-        // ID: tanggal 30, tgl 30
-        // EN: 30th, 30st, 30nd, 30rd, on the 30
-        // CJK: 30日
-        // KO: 30일
+        // ... (Existing logic but with improved clamping) ...
         
         let dayPatterns = [
             #"tanggal\s+(\d{1,2})"#,
@@ -833,45 +909,27 @@ struct VoiceCommandView: View {
                 let matches = regex.matches(in: text, options: [], range: NSRange(location: 0, length: nsText.length))
                 
                 for match in matches {
-                    // Extract the digit
-                    // Group 1 is usually the digit in "tanggal (\d)"
-                    // But in "(\d)st", group 1 is also digit.
-                    // Let's find the group that captures digits.
                     for i in 1..<match.numberOfRanges {
                         let range = match.range(at: i)
                         if range.location != NSNotFound {
                             let digitStr = nsText.substring(with: range)
-                            if let day = Int(digitStr), day >= 1 && day <= 31 {
-                                var comps = cal.dateComponents([.year, .month, .day], from: now)
-                                let currentDay = comps.day ?? 1
-                                
-                                comps.day = day
+                            if let day = Int(digitStr), day >= 1 && day <= 34 { // allow up to 34 to catch overflow first
+                                var comps = cal.dateComponents([.year, .month], from: now)
+                                let currentDay = cal.component(.day, from: now)
                                 
                                 // Logic: If today is 25th and user says "30th", it's this month.
                                 // If today is 30th and user says "5th", it's next month.
-                                
                                 if day < currentDay {
-                                    // Strictly next month
-                                    if let month = comps.month {
-                                        comps.month = month + 1
-                                    }
+                                   if let m = comps.month { comps.month = m + 1 }
                                 }
                                 
-
-                                // Clamp to Valid Month:
-                                // If user says "30" in Feb (max 28), set to Feb 28.
-                                // Don't roll over to March (user dislikes explicitly).
-                                if let testDate = cal.date(from: comps),
-                                   let range = cal.range(of: .day, in: .month, for: testDate) {
-                                    let maxDay = range.count
-                                    if day > maxDay {
-                                        comps.day = maxDay
-                                    } else {
-                                        comps.day = day
-                                    }
+                                // CLAMPING LOGIC
+                                comps.day = 1
+                                if let monthStart = cal.date(from: comps),
+                                   let range = cal.range(of: .day, in: .month, for: monthStart) {
+                                     comps.day = min(day, range.count)
                                 } else {
-                                    // Fallback if calendar fails
-                                    comps.day = day
+                                     comps.day = day
                                 }
                                 
                                 if let finalDate = cal.date(from: comps) {
