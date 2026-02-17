@@ -807,10 +807,62 @@ struct VoiceCommandView: View {
             }
         }
         
-        // "tanggal X" (Indonesian for "date X")
-        if let match = text.range(of: #"tanggal (\d{1,2})"#, options: .regularExpression) {
-            let numStr = text[match].replacingOccurrences(of: "tanggal ", with: "")
-            if let day = Int(numStr) {
+        // 5. Explicit Day Parsing (e.g. "tanggal 30", "30th", "30日")
+        // Patterns:
+        // ID: tanggal 30, tgl 30
+        // EN: 30th, 30st, 30nd, 30rd, on the 30
+        // CJK: 30日
+        // KO: 30일
+        
+        let dayPatterns = [
+            #"tanggal\s+(\d{1,2})"#,
+            #"tgl\s+(\d{1,2})"#,
+            #"on\s+the\s+(\d{1,2})"#,
+            #"(\d{1,2})(?:st|nd|rd|th)"#,
+            #"(\d{1,2})\s*日"#,
+            #"(\d{1,2})\s*일"#
+        ]
+        
+        for pattern in dayPatterns {
+            if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) {
+                let nsText = text as NSString
+                let matches = regex.matches(in: text, options: [], range: NSRange(location: 0, length: nsText.length))
+                
+                for match in matches {
+                    // Extract the digit
+                    // Group 1 is usually the digit in "tanggal (\d)"
+                    // But in "(\d)st", group 1 is also digit.
+                    // Let's find the group that captures digits.
+                    for i in 1..<match.numberOfRanges {
+                        let range = match.range(at: i)
+                        if range.location != NSNotFound {
+                            let digitStr = nsText.substring(with: range)
+                            if let day = Int(digitStr), day >= 1 && day <= 31 {
+                                var comps = cal.dateComponents([.year, .month, .day], from: now)
+                                let currentDay = comps.day ?? 1
+                                
+                                comps.day = day
+                                
+                                // Logic: If today is 25th and user says "30th", it's this month.
+                                // If today is 30th and user says "5th", it's next month.
+                                // If today is 30th and user says "30th", it's today (or next month if strictly future? Let's assume today for now, time parsing will adjust if time passed).
+                                
+                                if day < currentDay {
+                                    // Next month
+                                    if let month = comps.month {
+                                        comps.month = month + 1
+                                    }
+                                }
+                                
+                                if let date = cal.date(from: comps) {
+                                    return date
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
                 var comps = cal.dateComponents([.year, .month], from: now)
                 comps.day = day
                 if let result = cal.date(from: comps), result > now {
