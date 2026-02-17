@@ -344,9 +344,8 @@ struct VoiceCommandView: View {
         // Auto-analyze when recording stops
         .onChange(of: speechManager.isRecording) { _, isRecording in
             if !isRecording && !speechManager.recognizedText.isEmpty && !speechManager.recognizedText.starts(with: "Listening") {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    analyzeCommand()
-                }
+                // Immediate analysis
+                analyzeCommand()
             }
         }
         .sheet(isPresented: $showLanguagePicker) {
@@ -563,6 +562,8 @@ struct VoiceCommandView: View {
             "tambah tugas", "buat tugas", "ingatkan saya untuk", "ingatkan saya", "ingatkan",
             "besok saya ada", "besok ada", "besok saya punya",
             "saya ada", "saya punya", "ada",
+            "aku mau", "aku ingin", "tolong", "tolong buatkan", "tolong ingatkan", "tolong catat",
+            "saya mau", "saya ingin",
             "タスクを作成", "リマインド",
             "nova tarea", "nova tarefa"
         ]
@@ -587,8 +588,8 @@ struct VoiceCommandView: View {
             #"(?i)\s*\b(besok|tomorrow|내일|mañana|demain|morgen|amanhã|غدا|कल|พรุ่งนี้|ngày mai|esok|domani|завтра|yarın|明日|明天)\b"#,
             #"(?i)\s*\b(lusa|day after tomorrow|모레|pasado mañana|après-demain|übermorgen|depois de amanhã|dopodomani|послезавтра|öbür gün|明後日|后天)\b"#,
             // Global Time Patterns
-            #"(?i)(?:at|jam|pukul|à|um|as|alle|в|saat|lúc)\s+(\d{1,2})(?:[.:](\d{2}))?(?:\s*(am|pm|pagi|siang|sore|malam|du matin|de l'après-midi|domani|manhã|tarde|sabah|akşam|sáng|chiều))?"#,
-            #"(?i)(\d{1,2})(?:[.:](\d{2}))?\s*(am|pm|h|heures|uhr|horas|baje|โมง|giờ|시|点|點|時)"#,
+            #"(?i)(?:at|jam|pukul|à|um|as|alle|в|saat|lúc)\s+(\d{1,2})(?:\s*[.:]\s*(\d{2}))?(?:\s*(am|pm|pagi|siang|sore|malam|du matin|de l'après-midi|domani|manhã|tarde|sabah|akşam|sáng|chiều))?"#,
+            #"(?i)(\d{1,2})(?:\s*[.:]\s*(\d{2}))?\s*(am|pm|h|heures|uhr|horas|baje|โมง|giờ|시|点|點|時)"#,
             // CJK Clean patterns (Simplified to avoid complexity issues)
             #"\s*明日"#, #"\s*明天"#, #"\s*明後日"#, #"\s*后天"#, #"\s*来週"#, #"\s*下周"#,
             // Match time pattern with optional prefix/suffix but simplified groups
@@ -819,27 +820,22 @@ struct VoiceCommandView: View {
         _ = Calendar.current
         
         // Unified Prefix Pattern: "at 5", "jam 5", "pukul 5", "à 5", "um 5", "saat 5"
-        // (at|jam|pukul|à|um|as|alle|в|saat|lúc) + space + number + (optional: :number) + (optional: am/pm/pagi/sore/etc)
-        let prefixPattern = #"(?i)(?:at|jam|pukul|à|um|as|alle|в|saat|lúc)\s+(\d{1,2})(?:[.:](\d{2}))?(?:\s*(am|pm|pagi|siang|sore|malam|du matin|de l'après-midi|domani|manhã|tarde|sabah|akşam|sáng|chiều))?"#
+        // Allow robust separator matching: "11.15", "11 . 15", "11:15"
+        let prefixPattern = #"(?i)(?:at|jam|pukul|à|um|as|alle|в|saat|lúc)\s+(\d{1,2})(?:\s*[.:]\s*(\d{2}))?(?:\s*(am|pm|pagi|siang|sore|malam|du matin|de l'après-midi|domani|manhã|tarde|sabah|akşam|sáng|chiều))?"#
         if let match = text.range(of: prefixPattern, options: .regularExpression) {
             let timeStr = String(text[match])
             return extractGlobalTime(from: timeStr, pattern: prefixPattern, baseDate: baseDate)
         }
         
         // Unified Suffix Pattern: "5 pm", "5 h", "5 o'clock", "5 giờ", "5시", "5点"
-        // number + (optional: :number) + space + (am|pm|h|heures|uhr|horas|baje|โมง|giờ|시|点|時)
-        let suffixPattern = #"(?i)(\d{1,2})(?:[.:](\d{2}))?\s*(am|pm|h|heures|uhr|horas|baje|โมง|giờ|시|点|點|時)"#
+        let suffixPattern = #"(?i)(\d{1,2})(?:\s*[.:]\s*(\d{2}))?\s*(am|pm|h|heures|uhr|horas|baje|โมง|giờ|시|点|點|時)"#
         if let match = text.range(of: suffixPattern, options: .regularExpression) {
             let timeStr = String(text[match])
             return extractGlobalTimeSuffix(from: timeStr, pattern: suffixPattern, baseDate: baseDate)
         }
         
         // CJK / Korean Contextual Time
-        // Japanese: "午後9時", "夜9時", "9時に"
-        // Korean: "오후 3시", "저녁 9시", "9시에"
-        // Chinese: "下午3点", "晚上9点"
-        // Modifiers: Gozen/Gogo/Asa/Yoru/Gogo/Shangwu/Xiawu/Wanshang/Ojeon/Ohu/Jeonyeok/Bam etc.
-        let cjkPattern = #"(午前|午後|朝|夜|深夜|夕方|上午|下午|早上|晚上|中午|凌晨|오전|오후|아침|저녁|밤|새벽)?\s*(\d{1,2})\s*(?:時|点|點|시)(?:\s*(\d{1,2})\s*(?:分|분))?(?:に|へ|에|から|まで|부터|まで)?"#
+        let cjkPattern = #"(?:午前|午後|朝|夜|深夜|夕方|上午|下午|早上|晚上|中午|凌晨|오전|오후|아침|저녁|밤|새벽)?\s*(\d{1,2})\s*(?:時|点|點|시)(?:\s*(\d{1,2})\s*(?:分|분))?(?:에|に|へ|から|まで|부터)?"#
         if let match = text.range(of: cjkPattern, options: .regularExpression) {
             let timeStr = String(text[match])
             return extractCJKTime(from: timeStr, pattern: cjkPattern, baseDate: baseDate) ?? baseDate
@@ -858,20 +854,34 @@ struct VoiceCommandView: View {
         
         var minute = 0
         if match.range(at: 2).location != NSNotFound, let minRange = Range(match.range(at: 2), in: text) {
+            // Remove whitespace from minute string logic if needed, but Int() usually handles clean digits from captured group
+            // Wait, if regex captures "15" into group 2, it is clean.
             minute = Int(text[minRange]) ?? 0
         }
         
         // AM/PM/Keywords check
         if match.numberOfRanges > 3, match.range(at: 3).location != NSNotFound, let kwRange = Range(match.range(at: 3), in: text) {
             let kw = text[kwRange].lowercased()
-            // PM keywords
-            if ["pm", "sore", "malam", "siang", "de l'après-midi", "tarde", "akşam", "chiều"].contains(where: { kw.contains($0) }) {
+            
+            // 1. Explicit PM (12 PM -> 12, 1 PM -> 13)
+            if ["pm", "sore", "de l'après-midi", "tarde", "akşam", "chiều"].contains(where: { kw.contains($0) }) {
                 if hour < 12 { hour += 12 }
-                 // Siang special case handled loosely here (11-14)
-                 if kw.contains("siang") && hour < 11 { hour += 12 } // 2 siang -> 14
             }
-            // AM keywords
-            if ["am", "pagi", "du matin", "manhã", "sabah", "sáng"].contains(where: { kw.contains($0) }) {
+            // 2. "Malam" (Night) logic
+            else if kw.contains("malam") || kw.contains("night") {
+                if hour == 12 { hour = 0 } // 12 Malam -> 00:00 (Midnight)
+                else if hour < 12 { hour += 12 } // 9 Malam -> 21:00
+            }
+            // 3. "Siang" (Day/Noon) logic (11:00 - 14:00)
+            else if kw.contains("siang") {
+                // 12 Siang -> 12:00
+                // 1 Siang -> 13:00
+                // 2 Siang -> 14:00
+                // 11 Siang -> 11:00
+                if hour < 11 { hour += 12 } // 1, 2, 3... -> 13, 14, 15...
+            }
+            // 4. Explicit AM (12 AM -> 0)
+            else if ["am", "pagi", "du matin", "manhã", "sabah", "sáng"].contains(where: { kw.contains($0) }) {
                 if hour == 12 { hour = 0 }
             }
         }
