@@ -185,8 +185,23 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
             body: notification.request.content.body
         )
         
-        // Show banner + sound + badge even while app is open
-        completionHandler([.banner, .sound, .badge, .list])
+        if notification.request.content.categoryIdentifier == "TASK_ALARM" {
+            let fullID = notification.request.identifier
+            let id = fullID.replacingOccurrences(of: "_before", with: "")
+                           .replacingOccurrences(of: "_after", with: "")
+                           .replacingOccurrences(of: "_minus", with: "")
+                           .replacingOccurrences(of: "_plus", with: "")
+            
+            // Trigger Alarm Overlay immediately (like a phone call)
+            DispatchQueue.main.async {
+                self.activeAlarmID = id
+            }
+            // Suppress system banner/sound because Overlay handles it
+            completionHandler([])
+        } else {
+            // Show banner + sound + badge even while app is open
+            completionHandler([.banner, .sound, .badge, .list])
+        }
     }
     
     /// Save a NotificationRecord into SwiftData so it appears in the history list.
