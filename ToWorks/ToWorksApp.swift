@@ -10,9 +10,13 @@ import SwiftData
 
 @main
 struct ToWorksApp: App {
+    @AppStorage("hasOnboarded") private var hasOnboarded = false
+    @StateObject private var notificationManager = NotificationManager.shared
+    
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
+            TodoItem.self,
+            NotificationRecord.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
@@ -22,10 +26,37 @@ struct ToWorksApp: App {
             fatalError("Could not create ModelContainer: \(error)")
         }
     }()
+    
+    init() {
+        // Ensure Application Support directory exists (Fix for Simulator Sandbox issues)
+        if let supportDir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+             try? FileManager.default.createDirectory(at: supportDir, withIntermediateDirectories: true)
+        }
+        
+        // Request Notification Permissions on Launch
+        NotificationManager.shared.requestAuthorization()
+    }
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ZStack {
+                if hasOnboarded {
+                    ContentView()
+                } else {
+                    OnboardingView()
+                }
+                
+                // Alarm Overlay
+                if let alarmID = notificationManager.activeAlarmID {
+                    AlarmOverlayView(taskID: alarmID) {
+                        notificationManager.activeAlarmID = nil
+                    }
+                    .transition(.move(edge: .bottom))
+                    .zIndex(100)
+                }
+            }
+            .animation(.spring, value: notificationManager.activeAlarmID)
+            .animation(.default, value: hasOnboarded)
         }
         .modelContainer(sharedModelContainer)
     }
