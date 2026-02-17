@@ -72,7 +72,11 @@ class SpeechManager: ObservableObject {
     
     func startRecording() {
         // Refresh recognizer with current language
-        speechRecognizer = SFSpeechRecognizer(locale: resolvedLocale)
+        guard let recognizer = SFSpeechRecognizer(locale: resolvedLocale) else {
+            self.error = "Voice language not supported on this device"
+            return
+        }
+        speechRecognizer = recognizer
         
         if recognitionTask != nil {
             recognitionTask?.cancel()

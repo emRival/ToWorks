@@ -586,7 +586,10 @@ struct VoiceCommandView: View {
             #"\s*jam\s*\d{1,2}[.:]+\d{2}\s*(?:pagi|siang|sore|malam)?"#,
             #"\s*jam\s*\d{1,2}\s*(?:pagi|siang|sore|malam)"#,
             #"\s*pukul\s*\d{1,2}[.:]?\d{0,2}"#,
-            #"\s*at\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?"#
+            #"\s*at\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?"#,
+            // CJK Clean patterns
+            #"\s*明日"#, #"\s*明天"#, #"\s*明後日"#, #"\s*后天"#, #"\s*来週"#, #"\s*下周"#,
+            #"(午前|午後|上午|下午)?\s*(\d{1,2})\s*(?:時|点|點)(?:\s*(\d{1,2})\s*(?:分))?"#
         ]
         for pattern in cleanPatterns {
             title = title.replacingOccurrences(of: pattern, with: "", options: .regularExpression, range: title.startIndex..<title.endIndex)
