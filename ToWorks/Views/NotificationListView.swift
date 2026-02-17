@@ -55,9 +55,11 @@ struct NotificationListView: View {
                 }
                 
                 Section {
+                    #if DEBUG
                     Button(action: addTestNotification) {
                         Label(LocalizationManager.shared.localized("Test System Notification"), systemImage: "bell.badge.fill")
                     }
+                    #endif
                     
                     if !notifications.isEmpty {
                         Button(role: .destructive, action: clearAll) {
