@@ -462,63 +462,61 @@ struct VoiceCommandView: View {
         date = parseTime(from: lowText, baseDate: date)
         
         // =============================================
-        // STEP 3: Extract Location ("di [place]")
         // =============================================
-        // Pattern: "di [place]" — capture word(s) after "di" up to a comma, time phrase, or note keyword
-        // Path 1: "di [place]" (Indonesian/Malay)
-        let locationPattern = #"\bdi\s+([A-Za-z\u00C0-\u024F]+(?:\s+[A-Za-z\u00C0-\u024F]+)*)"#
-        if let regex = try? NSRegularExpression(pattern: locationPattern, options: .caseInsensitive) {
+        // STEP 3: Extract Location
+        // =============================================
+        // Authentic Rules for each language group
+        
+        // 1. Prefix-based (Indonesian, English, Spanish, French, German, etc.)
+        // Patterns: "di [Place]", "at [Place]", "in [Place]", "en [Place]", "à [Place]", "dans [Place]", "bei [Place]"
+        let prefixLocationPattern = #"(?i)\b(?:di|at|in|en|à|dans|bei|ke)\s+([A-Za-z\u00C0-\u024F\u4e00-\u9fa5]+(?:\s+[A-Za-z\u00C0-\u024F\u4e00-\u9fa5]+)*)"#
+        
+        if let regex = try? NSRegularExpression(pattern: prefixLocationPattern, options: .caseInsensitive) {
             let nsText = workingText as NSString
-            let nsRange = NSRange(location: 0, length: nsText.length)
-            let matches = regex.matches(in: workingText, options: [], range: nsRange)
+            let matches = regex.matches(in: workingText, options: [], range: NSRange(location: 0, length: nsText.length))
             
-            let nonLocationWords = ["dalam", "atas", "bawah", "sini", "situ", "sana", "mana", "antara", "rumah"]
+            let nonLocationWords = ["swapping", "sini", "situ", "sana", "mana", "that", "this", "what", "which", "sin", "para", "pour", "avec", "mit", "rumah", "home", "besok", "lusa", "pagi", "siang", "sore", "malam", "the"]
             
             for match in matches {
                 if let captureRange = Range(match.range(at: 1), in: workingText) {
-                    let captured = String(workingText[captureRange]).trimmingCharacters(in: .whitespacesAndNewlines)
-                    let firstWord = captured.lowercased().split(separator: " ").first.map(String.init) ?? captured.lowercased()
+                    var captured = String(workingText[captureRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    
+                    // Stop word cleanup
+                    let stopWords = [" jam", " pukul", " besok", " lusa", " today", " tomorrow", " next", " at ", " in ", " on "]
+                    for stop in stopWords {
+                        if let range = captured.lowercased().range(of: stop) {
+                            captured = String(captured[captured.startIndex..<range.lowerBound])
+                        }
+                    }
+                    
+                    let firstWord = captured.lowercased().split(separator: " ").first.map(String.init) ?? ""
                     
                     if !nonLocationWords.contains(firstWord) && captured.count > 2 {
-                        // Clean up trailing keywords
-                        var cleanLocation = captured
-                        // Add "malam", "siang", "pagi" to stop words to prevent "sekolah malam" from being location unless intended? 
-                        // Actually, "di sekolah malam" -> "sekolah". "di sekolah jam 5" -> "sekolah" matched by stop words below.
-                        let stopWords = ["jam", "pukul", "jangan", "catatan", "notes", "besok", "lusa", "pada", "saat"]
-                        for stop in stopWords {
-                            if let stopRange = cleanLocation.lowercased().range(of: " \(stop)") { // use space to avoid partial match inside word
-                                cleanLocation = String(cleanLocation[cleanLocation.startIndex..<stopRange.lowerBound])
-                            }
-                        }
-                        cleanLocation = cleanLocation.trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
-                        
-                        if !cleanLocation.isEmpty {
-                            location = cleanLocation.split(separator: " ").map { $0.prefix(1).uppercased() + $0.dropFirst().lowercased() }.joined(separator: " ")
-                        }
+                        location = captured.capitalized
                         break
                     }
                 }
             }
         }
         
-        // Path 2: "[Place]で" (Japan - 'de' implies location of action)
-        // Regex: (Any non-whitespace characters) + で
-        // Avoid capturing numbers (dates/times) before 'de'
+        // 2. Suffix-based (Japanese, Korean)
+        // Patterns: "[Place]で", "[Place]に", "[Place]에서", "[Place]에"
+        // Allow spaces before particle just in case: "[Place] で"
         if location.isEmpty {
-            // Look for pattern: Not-Space-Or-Digit + で (de)
-            // e.g. "学校で" (Gakkou de) -> "学校"
-            let jpLocationPattern = #"([^\s\d\p{P}]+)で"#
-            if let jpRegex = try? NSRegularExpression(pattern: jpLocationPattern, options: []) {
+            let suffixLocationPattern = #"([^\s\d\p{P}]+)\s*(?:で|に|에서|에)(?!\w)"#
+             if let jpRegex = try? NSRegularExpression(pattern: suffixLocationPattern, options: []) {
                 let nsText = workingText as NSString
                 let matches = jpRegex.matches(in: workingText, options: [], range: NSRange(location: 0, length: nsText.length))
                 
                 for match in matches {
                     if let captureRange = Range(match.range(at: 1), in: workingText) {
-                        let captured = String(workingText[captureRange])
-                        // Filter out common non-location particles/words if necessary
-                        if captured.count > 1 { // Avoid single chars if possible
-                             location = captured
-                             break
+                        let captured = String(workingText[captureRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                        
+                        // Sanity check: ensure it's not a common grammatical particle or time word acting up
+                        let invalidSuffixes = ["明日", "昨日", "今日", "何", "誰", "私", "僕", "俺", "내일", "오늘", "지금"]
+                        if !invalidSuffixes.contains(captured) && captured.count > 1 {
+                            location = captured
+                            break
                         }
                     }
                 }
@@ -665,20 +663,30 @@ struct VoiceCommandView: View {
     
     // MARK: - Voice Normalization
     
+    // MARK: - Voice Normalization
+    
     private func normalizeVoiceInput(_ text: String) -> String {
         var processed = text
         
         // 1. Full-width to Half-width numbers ((０-９) -> (0-9))
-        let fullWidth = ["０","１","２","３","４","５","６","７","８","９"]
+        let fullWidth = ["０","１","２","３","４","５","６","７","７","８","９"]
         for (i, char) in fullWidth.enumerated() {
             processed = processed.replacingOccurrences(of: char, with: "\(i)")
         }
         
-        // 2. Kanji/Hanzi Numerals (Simple 1-10, 20, 30...)
-        // This is a basic implementation. For "23" (二十三), simplistic replacement might fail without logic.
-        // But Speech Recognizer often outputs "23" or "二十三".
-        // Let's handle 1-12 specifically for time, and common day numbers.
+        // 2. Normalize Time Separators: Replace . , 。 ． ： with :
+        // This fixes "11.15" -> "11:15" ensuring generic regex catches it
+        let separators = [".", ",", "。", "．", "：", " "]
+        // Only replace if surrounded by digits to avoid breaking text
+        // Actually, safer to just replace specific time-like patterns using regex
+        // Pattern: (\d{1,2})[.,。．：](\d{2}) -> $1:$2
+        let timeSepPattern = #"(\d{1,2})[.,。．：\s](\d{2})\b"#
+        if let regex = try? NSRegularExpression(pattern: timeSepPattern, options: []) {
+            let range = NSRange(processed.startIndex..., in: processed)
+            processed = regex.stringByReplacingMatches(in: processed, options: [], range: range, withTemplate: "$1:$2")
+        }
         
+        // 3. Kanji/Hanzi Numerals (Simple 1-10, 20, 30...)
         let kanjiMap: [(String, String)] = [
             ("一", "1"), ("二", "2"), ("三", "3"), ("四", "4"), ("五", "5"),
             ("六", "6"), ("七", "7"), ("八", "8"), ("九", "9"), ("十", "10"),
@@ -686,15 +694,8 @@ struct VoiceCommandView: View {
         ]
         
         for (kanji, digit) in kanjiMap {
-            // Only replace if surrounded by time keywords OR if it looks like a standalone number
-            // For safety, let's just replace them if they are likely time.
-            // Actually, replacing globally is usually safe for Task Titles too unless context is lost.
             processed = processed.replacingOccurrences(of: kanji, with: digit)
         }
-        
-        // Arabic/Persian/Hindi numerals if needed
-        // For now, iOS SpeechRecognizer usually respects locale but might output locale-specific digits.
-        // Let's stick to CJK normalization first as requested.
         
         return processed
     }
