@@ -857,21 +857,25 @@ struct VoiceCommandView: View {
                                     }
                                 }
                                 
-                                // LOOP: Find next valid month for this day
-                                // e.g. If today is Feb 17, user says "30". Feb 30 invalid.
-                                // Code defaults to March 2. We want March 30 (or April 30 if March didn't have 30).
-                                var attempts = 0
-                                while attempts < 12 {
-                                    if let candidate = cal.date(from: comps) {
-                                        let candidateDay = cal.component(.day, from: candidate)
-                                        if candidateDay == day {
-                                            return candidate
-                                        }
+
+                                // Clamp to Valid Month:
+                                // If user says "30" in Feb (max 28), set to Feb 28.
+                                // Don't roll over to March (user dislikes explicitly).
+                                if let testDate = cal.date(from: comps),
+                                   let range = cal.range(of: .day, in: .month, for: testDate) {
+                                    let maxDay = range.count
+                                    if day > maxDay {
+                                        comps.day = maxDay
+                                    } else {
+                                        comps.day = day
                                     }
-                                    // If we are here, the date wrapped (e.g. Feb 30 -> Mar 2)
-                                    // Move to next month and try again
-                                    if let m = comps.month { comps.month = m + 1 }
-                                    attempts += 1
+                                } else {
+                                    // Fallback if calendar fails
+                                    comps.day = day
+                                }
+                                
+                                if let finalDate = cal.date(from: comps) {
+                                    return finalDate
                                 }
                             }
                         }
