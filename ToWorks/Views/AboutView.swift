@@ -62,7 +62,7 @@ struct AboutView: View {
                             .shadow(color: .orange.opacity(0.2), radius: 20, y: 10)
                             
                             VStack(spacing: 8) {
-                                Text("ToWorks")
+                                Text("ToWorks - Focus & To-Do List")
                                     .font(.system(size: 32, weight: .black, design: .rounded))
                                 
                                 HStack(spacing: 6) {
@@ -94,7 +94,7 @@ struct AboutView: View {
                                     .foregroundColor(.blue)
                             }
                             
-                            Text("ToWorks is a modern productivity app designed to help you manage tasks efficiently with a smart calendar, voice commands, and detailed statistics.")
+                            Text("ToWorks - Focus & To-Do List is a modern productivity app designed to help you manage tasks efficiently with a smart calendar, voice commands, and detailed statistics.")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                                 .lineSpacing(5)
@@ -181,7 +181,7 @@ struct AboutView: View {
                             Text("Made with ❤️ in Indonesia")
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.secondary)
-                            Text("© 2026 ToWorks. All rights reserved.")
+                            Text("© 2026 ToWorks - Focus & To-Do List. All rights reserved.")
                                 .font(.caption2)
                                 .foregroundColor(.secondary.opacity(0.6))
                         }

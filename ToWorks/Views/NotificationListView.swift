@@ -86,7 +86,7 @@ struct NotificationListView: View {
     
     private func addTestNotification() {
         let title = "Test Notification"
-        let body = "This is a test notification from ToWorks."
+        let body = "This is a test notification from ToWorks - Focus & To-Do List."
         let date = Date()
         
         NotificationManager.shared.scheduleNotification(
