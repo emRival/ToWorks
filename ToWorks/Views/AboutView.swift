@@ -62,7 +62,7 @@ struct AboutView: View {
                             .shadow(color: .orange.opacity(0.2), radius: 20, y: 10)
                             
                             VStack(spacing: 8) {
-                                Text("ToWorks - Focus & To-Do List")
+                                Text("ToWorks")
                                     .font(.system(size: 32, weight: .black, design: .rounded))
                                 
                                 HStack(spacing: 6) {
