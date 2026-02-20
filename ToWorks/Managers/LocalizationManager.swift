@@ -93,7 +93,7 @@ class LocalizationManager: ObservableObject {
             "Tasks Summary": "Ringkasan Tugas",
             "Delete Completed Tasks": "Hapus Tugas Selesai",
             "Delete All Tasks": "Hapus Semua Tugas",
-            "About ToWorks": "Tentang ToWorks - Focus & To-Do List",
+            "About ToWorks": "Tentang ToWorks",
             "Version, Author & Info": "Versi, Penulis & Info",
             
             // New Task
@@ -145,7 +145,7 @@ class LocalizationManager: ObservableObject {
             "Good Evening,": "Selamat Malam,",
             
             // Onboarding
-            "Welcome to ToWorks": "Selamat Datang di ToWorks - Focus & To-Do List",
+            "Welcome to ToWorks": "Selamat Datang di ToWorks",
             "Let's get productive. First, what should we call you?": "Mari produktif. Pertama, siapa nama Anda?",
             "YOUR NAME": "NAMA ANDA",
             "Enter your first name": "Masukkan nama depan Anda",
@@ -216,7 +216,7 @@ class LocalizationManager: ObservableObject {
             "Tasks Summary": "タスク概要",
             "Delete Completed Tasks": "完了タスクを削除",
             "Delete All Tasks": "全タスクを削除",
-            "About ToWorks": "ToWorks - Focus & To-Do Listについて",
+            "About ToWorks": "ToWorks について",
             "Version, Author & Info": "バージョン、作者、情報",
             
             "Create New Task": "新規タスク作成",
@@ -267,7 +267,7 @@ class LocalizationManager: ObservableObject {
             "Good Evening,": "こんばんは、",
             
             // Onboarding
-            "Welcome to ToWorks": "ToWorks - Focus & To-Do Listへようこそ",
+            "Welcome to ToWorks": "ToWorks へようこそ",
             "Let's get productive. First, what should we call you?": "生産的になりましょう。まず、お名前は？",
             "YOUR NAME": "お名前",
             "Enter your first name": "名前を入力",
@@ -287,8 +287,8 @@ class LocalizationManager: ObservableObject {
             "Tap the mic to start": "マイクをタップして開始"
         ],
         "en-US": [
-            "About ToWorks": "About ToWorks - Focus & To-Do List",
-            "Welcome to ToWorks": "Welcome to ToWorks - Focus & To-Do List"
+            "About ToWorks": "About ToWorks",
+            "Welcome to ToWorks": "Welcome to ToWorks"
         ]
     ]
     
